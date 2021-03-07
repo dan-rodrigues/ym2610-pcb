@@ -6,6 +6,7 @@ ADPCM samples are fetched from the PSRAM as needed.
 
 The iCEBreaker Bitsy USB port is used to upload music data and also for control.
 
+![v1.0.0 PCB partially assembled](photo/pcb1.jpg)
 ## TODO
 
 This project is still in early development and major functionality is still being added.
