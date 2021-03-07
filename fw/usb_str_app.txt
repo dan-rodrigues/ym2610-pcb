@@ -1,0 +1,6 @@
+0000000000000000
+osmocom
+!{"bitsy-v0": "iCEBreaker bitsy v0.x", "bitsy-v1": "iCEBreaker bitsy v1.x", "icebreaker": "iCEBreaker", "": "iCE40 USB"}
+bitsy YM2610 control
+DFU runtime
+

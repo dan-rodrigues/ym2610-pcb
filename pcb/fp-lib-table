@@ -1,0 +1,11 @@
+(fp_lib_table
+  (lib (name Bourns_Potentiometer)(type KiCad)(uri ${KIPRJMOD}/kicad-lib/Bourns_Potentiometer.pretty)(options "")(descr ""))
+  (lib (name Toshiba_Optical)(type KiCad)(uri ${KIPRJMOD}/kicad-lib/Toshiba_Optical.pretty)(options "")(descr ""))
+  (lib (name Cliff_Electronic_Optical)(type KiCad)(uri ${KIPRJMOD}/kicad-lib/Cliff_Electronic_Optical.pretty)(options "")(descr ""))
+  (lib (name pkl_module)(type KiCad)(uri ${KIPRJMOD}/pkl-1bs/pkl_module.pretty)(options "")(descr ""))
+  (lib (name DIP_Socket)(type KiCad)(uri ${KIPRJMOD}/kicad-lib/DIP_Socket.pretty)(options "")(descr ""))
+  (lib (name Switchcraft)(type KiCad)(uri ${KIPRJMOD}/kicad-lib/Switchcraft.pretty)(options "")(descr ""))
+  (lib (name SOIC_Asymmetric)(type KiCad)(uri ${KIPRJMOD}/kicad-lib/SOIC_Asymmetric.pretty)(options "")(descr ""))
+  (lib (name CUI_RCJ)(type KiCad)(uri ${KIPRJMOD}/kicad-lib/CUI_RCJ.pretty)(options "")(descr ""))
+  (lib (name CUI_DIN)(type KiCad)(uri ${KIPRJMOD}/kicad-lib/CUI_DIN.pretty)(options "")(descr ""))
+)

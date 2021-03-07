@@ -1,0 +1,37 @@
+[submodule "build"]
+	path = no2fpga/build
+	url = https://github.com/no2fpga/no2build.git
+[submodule "cores/no2misc"]
+	path = no2fpga/cores/no2misc
+	url = https://github.com/no2fpga/no2misc.git
+[submodule "cores/no2usb"]
+	path = no2fpga/cores/no2usb
+	url = https://github.com/no2fpga/no2usb.git
+[submodule "cores/no2ice40"]
+	path = no2fpga/cores/no2ice40
+	url = https://github.com/no2fpga/no2ice40.git
+[submodule "cores/no2hub75"]
+	path = no2fpga/cores/no2hub75
+	url = https://github.com/no2fpga/no2hub75.git
+
+[submodule "no2fpga/build"]
+	path = no2fpga/build
+	url = https://github.com/no2fpga/no2build.git
+[submodule "no2fpga/cores/no2misc"]
+	path = no2fpga/cores/no2misc
+	url = https://github.com/no2fpga/no2misc.git
+[submodule "no2fpga/cores/no2usb"]
+	path = no2fpga/cores/no2usb
+	url = https://github.com/no2fpga/no2usb.git
+[submodule "no2fpga/cores/no2ice40"]
+	path = no2fpga/cores/no2ice40
+	url = https://github.com/no2fpga/no2ice40.git
+[submodule "no2fpga/cores/no2hub75"]
+	path = no2fpga/cores/no2hub75
+	url = https://github.com/no2fpga/no2hub75.git
+[submodule "pcb/kicad-lib"]
+	path = pcb/kicad-lib
+	url = https://github.com/dan-rodrigues/kicad-lib.git
+[submodule "pcb/pkl-1bs"]
+	path = pcb/pkl-1bs
+	url = https://github.com/esden/pretty-kicad-libs.git

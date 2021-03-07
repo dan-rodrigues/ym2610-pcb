@@ -1,0 +1,161 @@
+[*]
+[*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
+[*] Sun Mar  7 00:53:26 2021
+[*]
+[dumpfile] "/Users/dan.rodrigues/hw/ym2610-pmod/build-tmp/ym_tb.vcd"
+[dumpfile_mtime] "Sat Mar  6 23:03:29 2021"
+[dumpfile_size] 8290997
+[savefile] "/Users/dan.rodrigues/hw/ym2610-pmod/ym2610_pcm.gtkw"
+[timestart] 181320000
+[size] 1792 1036
+[pos] -1 -1
+*-21.000000 187622520 11316120 10566000 11816280 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] ym_tb.
+[treeopen] ym_tb.dut_I.
+[sst_width] 302
+[signals_width] 296
+[sst_expanded] 1
+[sst_vpaned_height] 416
+@28
+ym_tb.dut_I.spi_mem.clk
+ym_tb.dut_I.spi_mem.clk_2x
+@200
+-
+@22
+ym_tb.dut_I.spi_mem.mem_addr[23:0]
+@200
+-
+-
+@800200
+-adpcm_a
+@c00022
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+@28
+(0)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(1)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(2)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(3)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(4)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(5)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(6)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(7)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(8)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(9)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(10)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(11)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(12)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(13)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(14)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(15)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(16)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(17)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(18)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(19)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(20)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(21)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(22)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+(23)ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_addr[23:0]
+@1401200
+-group_end
+@22
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_rdata[7:0]
+@200
+-
+@22
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm[7:0]
+@28
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_ready
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mem_valid
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pcm_mux_needed
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.pause
+@200
+-
+@22
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.read_state[3:0]
+@28
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.write_state[2:0]
+@200
+-
+@28
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.rmpx_rose
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.rmpx_fell
+@200
+-
+@28
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.state[2:0]
+@1000200
+-adpcm_a
+@200
+-
+@800200
+-adpcm_b
+@200
+-
+@22
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.pcm_mem_addr[23:0]
+@28
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.pcm_mem_ready
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.pcm_mem_valid
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.pcm_mux_needed
+@200
+-
+@22
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.pcm[7:0]
+@28
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.read_active
+@1000200
+-adpcm_b
+@200
+-
+@c00200
+-spi_mem
+@28
+ym_tb.dut_I.spi_mem.mem_valid
+@22
+ym_tb.dut_I.spi_mem.state[3:0]
+@200
+-
+@28
+ym_tb.dut_I.spi_mem.spi_csn[1:0]
+ym_tb.dut_I.spi_mem.spi_clk
+@1401200
+-spi_mem
+@200
+-
+@22
+ym_tb.ym2610.p_address[23:0]
+ym_tb.ym2610.p_read_address[23:0]
+@28
+ym_tb.ym2610.p_read_complete
+@22
+ym_tb.ym2610.p_read_data[7:0]
+@28
+ym_tb.ym2610.p_read_interval[2:0]
+ym_tb.ym2610.p_read_needed
+@200
+-
+@22
+ym_tb.ym2610.pad[7:0]
+@28
+ym_tb.ym2610.poe
+@200
+-
+@29
+ym_tb.ym2160_pcm_mux.rmpx
+@28
+ym_tb.ym2610.roe
+@200
+-
+@22
+ym_tb.ym2610.a_address[23:0]
+@28
+ym_tb.ym2610.a_bus_state[2:0]
+@22
+ym_tb.ym2610.a_counter[3:0]
+ym_tb.ym2610.a_read_address[23:0]
+@28
+ym_tb.ym2610.a_read_complete
+@22
+ym_tb.ym2610.a_read_data[7:0]
+[pattern_trace] 1
+[pattern_trace] 0

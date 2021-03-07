@@ -1,0 +1,6 @@
+(sym_lib_table
+  (lib (name Toshiba_Optical)(type Legacy)(uri ${KIPRJMOD}/kicad-lib/Toshiba_Optical.lib)(options "")(descr ""))
+  (lib (name Yamaha_Synth)(type Legacy)(uri ${KIPRJMOD}/kicad-lib/Yamaha_Synth.lib)(options "")(descr ""))
+  (lib (name Switchcraft)(type Legacy)(uri ${KIPRJMOD}/kicad-lib/Switchcraft.lib)(options "")(descr ""))
+  (lib (name pkl_module)(type Legacy)(uri ${KIPRJMOD}/pkl-1bs/pkl_module.lib)(options "")(descr ""))
+)

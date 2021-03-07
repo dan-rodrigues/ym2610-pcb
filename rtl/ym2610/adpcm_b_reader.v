@@ -1,0 +1,365 @@
+// adpcm_b_reader.v
+//
+// Copyright (C) 2021 Dan Rodrigues <danrr.gh.oss@gmail.com>
+//
+// SPDX-License-Identifier: CERN-OHL-W-2.0
+
+module adpcm_b_reader #(
+	parameter [23:0] ADDRESS_OFFSET = 24'b0
+) (
+	input clk,
+	input reset,
+
+	// Status
+
+	output reg [15:0] pmpx_rise_count,
+	output reg [15:0] pmpx_fall_count,
+	input pmpx_count_reset,
+
+	// PCM Mux
+
+	output reg pcm_mux_needed,
+	output reg read_active,
+
+	input pmpx_rose,
+	input pmpx_fell,
+
+	input [3:0] ym_io_in,
+
+	output [3:0] ym_io_out,
+	output ym_io_en,
+	output [2:0] mux_sel,
+	output mux_oe_n,
+	output pcm_load,
+
+	// PCM data reading
+
+	input [7:0] pcm_mem_rdata,
+	input pcm_mem_ready,
+
+	output [23:0] pcm_mem_addr,
+	output reg pcm_mem_valid
+);
+	// --- IO ---
+
+	reg [3:0] ym_io_out_nx;
+	reg [2:0] mux_sel_nx;
+	reg pcm_load_nx;
+	reg ym_io_en_nx;
+	reg mux_oe_n_nx;
+
+	assign ym_io_out = ym_io_out_nx;
+	assign mux_sel = mux_sel_nx;
+	assign pcm_load = pcm_load_nx;
+	assign ym_io_en = ym_io_en_nx;
+	assign mux_oe_n = mux_oe_n_nx;
+
+	// --- FSM ---
+
+	localparam [1:0]
+		S_IDLE = 0,
+		S_ADDRESS_READING = 1,
+		S_PCM_READING = 2,
+		S_PCM_WRITING = 3;
+
+	reg [1:0] state;
+	reg [1:0] state_nx;
+
+	always @(posedge clk) begin
+		state <= state_nx;
+	end
+
+	always @* begin
+		if (reset) begin
+			state_nx = S_IDLE;
+		end else begin
+			state_nx = state;
+
+			case (state)
+				S_IDLE: begin
+					if (pmpx_rose) begin
+						state_nx = S_ADDRESS_READING;
+					end
+				end
+				S_ADDRESS_READING: begin
+					if (address_read_complete) begin
+						state_nx = S_PCM_READING;
+					end
+				end
+				S_PCM_READING: begin
+					if (pcm_mem_ready) begin
+						state_nx = S_PCM_WRITING;
+					end
+				end
+				S_PCM_WRITING: begin
+					if (write_complete) begin
+						state_nx = S_IDLE;
+					end
+				end
+			endcase
+		end
+	end
+
+	// --- PCM mux control ---
+
+	reg [4:0] read_state;
+
+	always @* begin
+		if (reset) begin
+			read_active = 0;
+		end else begin
+			read_active = pmpx_rose || (state != S_IDLE);
+		end
+	end
+
+	always @* begin
+		if (reset) begin
+			pcm_mux_needed = 0;
+		end else if (pmpx_rose) begin
+			pcm_mux_needed = 1;
+		end else begin
+			case (state)
+				S_ADDRESS_READING, S_PCM_WRITING: begin
+					pcm_mux_needed = 1;
+				end
+				default: begin
+					pcm_mux_needed = 0;
+				end
+			endcase
+		end
+	end
+
+	always @(posedge clk) begin
+		if (reset) begin
+			read_state <= 0;
+		end else begin
+			if (state_changing_to(S_ADDRESS_READING)) begin
+				read_state <= 0;
+			end else if (state == S_ADDRESS_READING) begin
+				read_state <= read_state + 1;
+			end
+		end
+	end
+
+	// PCM mux selection:
+
+	always @* begin
+		mux_sel_nx = 0;
+		mux_oe_n_nx = 1;
+		pcm_load_nx = 0;
+		ym_io_out_nx = 0;
+		ym_io_en_nx = 0;
+
+		if (pmpx_rose) begin
+			mux_sel_nx = ar_mux_sel_nx;
+			mux_oe_n_nx = ar_mux_oe_n_nx;
+		end else begin
+			case (state)
+				S_ADDRESS_READING: begin
+					mux_sel_nx = ar_mux_sel_nx;
+					mux_oe_n_nx = ar_mux_oe_n_nx;
+				end
+				S_PCM_READING: begin
+					mux_sel_nx = pr_mux_sel_nx;
+					mux_oe_n_nx = pr_mux_oe_n_nx;
+				end
+				S_PCM_WRITING: begin
+					mux_sel_nx = pw_mux_sel_nx;
+					mux_oe_n_nx = pw_mux_oe_n_nx;
+					ym_io_en_nx = pw_ym_io_en_nx;
+
+					pcm_load_nx = pw_pcm_load_nx;
+					ym_io_out_nx = pw_ym_io_out_nx;
+				end
+			endcase
+		end
+	end
+
+	// PCM address reading output:
+
+	localparam [2:0]
+		MUX_SEL_PAD3_0 = 3'b010,
+		MUX_SEL_PAD7_4 = 3'b110,
+		MUX_SEL_PA11_8 = 3'b011;
+
+	reg [2:0] ar_mux_sel_nx;
+	reg ar_mux_oe_n_nx;
+
+	always @* begin
+		ar_mux_sel_nx = 0;
+		ar_mux_oe_n_nx = 1;
+
+		if (pmpx_rose) begin
+			// Address low (first cycle before entering state)
+			ar_mux_sel_nx = MUX_SEL_PAD3_0;
+			ar_mux_oe_n_nx = 0;
+		end else begin
+			case (read_state)
+				// Address low
+				0: begin
+					ar_mux_sel_nx = MUX_SEL_PAD7_4;
+					ar_mux_oe_n_nx = 0;
+				end
+				1: begin
+					ar_mux_sel_nx = MUX_SEL_PA11_8;
+					ar_mux_oe_n_nx = 0;
+				end
+				// Address high
+				2, 3, 4: begin
+					// 3 cycles while we wait for data to change to PMPX-fall output (hi address)
+					// We access it before the falling edge to buy time though
+					// This was previously 2 cycles delay only but that is right on the edge
+					// +1 cycle to give a bit more time for address to settle
+					// Waiting too long means read starts too late though, need to balance this
+					ar_mux_sel_nx = MUX_SEL_PAD3_0;
+					ar_mux_oe_n_nx = 0;
+				end
+				5: begin
+					ar_mux_sel_nx = MUX_SEL_PAD7_4;
+					ar_mux_oe_n_nx = 0;
+				end
+				6: begin
+					ar_mux_sel_nx = MUX_SEL_PA11_8;
+					ar_mux_oe_n_nx = 0;
+				end
+			endcase
+		end
+	end
+
+	// PCM mux address reading input:
+
+	reg [23:0] pcm_mem_addr_base;
+	reg address_read_complete;
+
+	assign pcm_mem_addr = pcm_mem_addr_base + ADDRESS_OFFSET;
+
+	always @(posedge clk) begin
+		address_read_complete <= 0;
+
+		case (read_state)
+			// States 0 are still waiting for inputs
+			1: begin
+				pcm_mem_addr_base[3:0] <= ym_io_in;
+			end
+			2: begin
+				pcm_mem_addr_base[7:4] <= ym_io_in;
+			end
+			3: begin
+				pcm_mem_addr_base[11:8] <= ym_io_in;
+			end
+			4, 5: begin
+				// ...waiting for the second set of signals to appear
+				// This might need tweaking
+			end
+			6: begin
+				pcm_mem_addr_base[15:12] <= ym_io_in;
+			end
+			7: begin
+				pcm_mem_addr_base[19:16] <= ym_io_in;
+			end
+			8: begin
+				pcm_mem_addr_base[23:20] <= ym_io_in;
+				address_read_complete <= 1;
+			end
+		endcase
+	end
+
+	// PCM read handling:
+
+	wire [2:0] pr_mux_sel_nx = 0;
+	wire pr_mux_oe_n_nx = 1;
+
+	always @* begin
+		// address_read_complete brings the pcm_mem_valid output 1 cycle earlier
+		// The 24bit address is already valid at this
+		pcm_mem_valid = address_read_complete || (state == S_PCM_READING);
+	end
+
+	reg [7:0] pcm;
+
+	always @(posedge clk) begin
+		if (pcm_mem_ready) begin
+			pcm <= pcm_mem_rdata;
+		end
+	end
+
+	// PCM write handling:
+
+	reg [1:0] write_state;
+
+	always @(posedge clk) begin
+		if (state_changing_to(S_PCM_WRITING)) begin
+			write_state <= 0;
+		end else if (state == S_PCM_WRITING) begin
+			write_state <= write_state + 1;
+		end
+	end	
+
+	reg [2:0] pw_mux_sel_nx;
+	reg pw_mux_oe_n_nx;
+	reg [3:0] pw_ym_io_out_nx;
+	reg pw_ym_io_en_nx;
+	reg pw_pcm_load_nx;
+
+	reg write_complete;
+
+	always @* begin
+		pw_mux_sel_nx = 0;
+		pw_mux_oe_n_nx = 1;
+		pw_pcm_load_nx = 0;
+		write_complete = 0;
+		pw_ym_io_en_nx = 1;
+		pw_ym_io_out_nx = 0;
+
+		case (write_state)
+			0: begin
+				// Low nybble: setup + LE high
+				pw_mux_sel_nx = 3'b101;
+				pw_ym_io_out_nx = pcm[3:0];
+			end
+			1: begin
+				// Low nybble: hold + LE low
+				pw_mux_sel_nx = 3'b100;
+				pw_ym_io_out_nx = pcm[3:0];
+			end
+			2: begin
+				// High nybble: setup + LE high
+				pw_mux_sel_nx = 3'b100;
+				pw_ym_io_out_nx = pcm[7:4];
+				pw_pcm_load_nx = 1;
+			end
+			3: begin
+				// High nybble: hold + LE low
+				pw_mux_sel_nx = 3'b100;
+				pw_ym_io_out_nx = pcm[7:4];
+				pw_pcm_load_nx = 0;
+
+				write_complete = 1;
+			end
+		endcase
+	end
+
+	// --- Status outputs ---
+
+	always @(posedge clk) begin
+		if (reset || pmpx_count_reset) begin
+			pmpx_rise_count <= 0;
+			pmpx_fall_count <= 0;
+		end else begin
+			if (pmpx_rose) begin
+				pmpx_rise_count <= pmpx_rise_count + 1;
+			end else if (pmpx_fell) begin
+				pmpx_fall_count <= pmpx_fall_count + 1;
+			end
+		end
+	end
+
+	// --- Convenience functions ---
+
+	function [0:0] state_changing_to;
+		input [1:0] new_state;
+
+		state_changing_to = (state_nx == new_state) && (state != new_state);
+	endfunction
+
+endmodule

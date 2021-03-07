@@ -1,0 +1,10 @@
+.DS_Store
+
+# ltspice
+
+/pcb/ltspice/*.raw
+
+# no2fpga
+
+/build-tmp
+

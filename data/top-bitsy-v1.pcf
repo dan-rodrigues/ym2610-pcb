@@ -1,0 +1,70 @@
+# YM2610 PCM Mux (discrete logic)
+
+set_io ym_io[0] 3 
+set_io ym_io[1] 9 
+set_io ym_io[2] 10 
+set_io ym_io[3] 11 
+
+set_io mux_sel[0] 23
+set_io mux_sel[1] 27
+set_io mux_sel[2] 26
+
+set_io mux_oe_n 25
+set_io pcm_load 4
+set_io rmpx 12
+set_io pmpx 21
+
+# YM3016
+
+set_io dac_clk 13
+set_io dac_sh1 20
+set_io dac_sh2 34
+set_io dac_so 32
+
+# SPDIF
+
+set_io spdif_out 45
+
+# MIDI
+
+set_io midi_rx 48
+
+# SPI
+set_io spi_io[0] 14
+set_io spi_io[1] 17
+set_io spi_io[2] 18
+set_io spi_io[3] 19
+
+set_io -nowarn spi_clk 15
+set_io -nowarn spi_flash_cs_n 16
+set_io -nowarn spi_ram_cs_n 6
+
+# USB
+set_io -nowarn usb_dp 42
+set_io -nowarn usb_dn 38
+set_io -nowarn usb_pu 37
+
+# UART
+set_io -nowarn uart_rx 47
+set_io -nowarn uart_tx 44
+
+# Clock
+set_io -nowarn clk_in 35
+
+# Button
+set_io -nowarn btn 2
+
+# Leds
+set_io -nowarn rgb[0] 39
+set_io -nowarn rgb[1] 40
+set_io -nowarn rgb[2] 41
+
+# Both an IO + LED on 24?
+#set_io led 25
+
+# YM2610
+
+set_io ym_clk 46
+set_io ym_shift_load 43
+set_io ym_shift_out 36
+
