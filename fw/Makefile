@@ -45,6 +45,7 @@ HEADERS_app=\
 	spi_mem.h \
 	mem_util.h \
 	ym2610/vgm.h \
+	ym2610/vgm_timer.h \
 	ym2610/ym_ctrl.h \
 	ym2610/pcm_mux.h \
 	ym2610/ym_dbg_dac.h \
@@ -57,6 +58,7 @@ SOURCES_app=\
 	fw_app.c \
 	usb_desc_app.c \
 	ym2610/vgm.c \
+	ym2610/vgm_timer.c \
 	ym2610/ym_ctrl.c \
 	ym2610/pcm_mux.c \
 	ym2610/ym_dbg_dac.c \

@@ -10,6 +10,8 @@
 
 #include "config.h"
 #include "ym_ctrl.h"
+#include "console.h"
+#include "mini-printf.h"
 
 static volatile uint32_t * const ym2610_ctrl = (void*)(YM2610_BASE);
 static void ym_busy_wait(void);
@@ -32,6 +34,7 @@ void ym_reset(bool reset_active) {
 }
 
 static void ym_busy_wait() {
-	// TODO: restore busy wait when actual YM is used
-    while (ym2610_ctrl[0] & 0x01) {}
+	while (ym2610_ctrl[0] & 0x01) {
+		printf("YM2610 CMD FIFO unexpectedly full..\n");
+	}
 }

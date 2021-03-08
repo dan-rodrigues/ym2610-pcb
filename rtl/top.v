@@ -65,7 +65,7 @@ module top(
 	output spdif_out
 );
 	localparam integer SPRAM_AW = 15; /* 14 => 64k, 15 => 128k */
-	localparam integer WB_N  =  12;
+	localparam integer WB_N  =  13;
 
 	localparam integer WB_DW = 32;
 	localparam integer WB_AW = 16;
@@ -383,7 +383,16 @@ module top(
 	// Timer [12]
 	//-----------
 
-	// TODO:
+	vgm_timer vgm_timer(
+		.clk(clk_24m),
+		.reset(rst),
+
+		.wb_wdata(wb_wdata),
+		.wb_we(wb_we),
+		.wb_cyc(wb_cyc[12]),
+		.wb_rdata(wb_rdata[12]),
+		.wb_ack(wb_ack[12])
+	);
 
 	// YM3016 DAC
 	//-----------

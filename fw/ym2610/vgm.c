@@ -17,6 +17,7 @@
 #include "ym_ctrl.h"
 #include "pcm_mux.h"
 #include "ym_dbg_dac.h"
+#include "vgm_timer.h"
 
 // Config:
 
@@ -38,8 +39,6 @@ static void vgm_player_sanity_check(void);
 static void vgm_player_init(void);
 static uint32_t vgm_player_update(void);
 static bool vgm_filter_reg_write(uint8_t port, uint8_t reg, uint8_t data);
-
-static void delay(uint32_t delay);
 
 static size_t vgm_index;
 static size_t vgm_loop_offset;
@@ -102,6 +101,7 @@ void vgm_pcm_write(uint32_t *data, size_t offset, size_t length) {
 void vgm_init_playback() {
 	vgm_player_sanity_check();
 	vgm_player_init();
+	vgm_timer_set(0);
 
 	// Don't allow PCM access to PSRAM until it's fully loaded
 	pcm_mux_set_enabled(true);
@@ -110,10 +110,12 @@ void vgm_init_playback() {
 }
 
 uint32_t vgm_continue_playback() {
-	uint32_t delay_ticks = vgm_player_update();
+	if (!vgm_timer_elapsed()) {
+		return 0;
+	}
 
-	// FIXME: use timer peripheral instead of this
-	delay(delay_ticks);
+	uint32_t delay_ticks = vgm_player_update();
+	vgm_timer_set(delay_ticks);
 
 	if (enable_dac_logging) {
 		dac_debug_log();
@@ -157,43 +159,6 @@ static void vgm_player_sanity_check() {
 	} else {
 		printf("Found Vgm header\n");
 	}
-}
-
-// TODO: replace the below with some WB timer peripheral that CPU can poll between USB tasks
-
-// This delay function is used in absence of IRQ or the timer instructions
-// If I end up redoing this properly, there will be a hardware timer instead of this
-// This is fine for a demo
-
-__attribute__((noinline))
-static void delay(uint32_t delay) {
-	if (!delay) {
-		return;
-	}
-
-	// This constant effectively controls the tempo
-	// This assumes PicoRV32 is used as configured in this branch
-	// (382.65 CPU cycles per sample)
-	const uint32_t inner_loop_iterations = 48;
-
-	uint32_t inner_loop_counter;
-
-	__asm __volatile__
-	(
-	 "loop_outer:\n"
-
-	 "li %1, %2\n"
-
-	 "loop_inner:\n"
-	 "addi %1, %1, -1\n"
-	 "bnez %1, loop_inner\n"
-
-	 "addi %0, %0, -1\n"
-	 "bnez %0, loop_outer\n"
-	 : "+r" (delay), "=r" (inner_loop_counter)
-	 : "i" (inner_loop_iterations)
-	 :
-	);
 }
 
 static void vgm_player_init() {
@@ -241,8 +206,8 @@ static uint32_t vgm_player_update() {
 
 		if ((cmd & 0xf0) == 0x70) {
 			// 0x7X
-			// Wait X samples
-			return cmd & 0x0f;
+			// Wait X + 1 samples
+			return (cmd & 0x0f) + 1;
 		}
 
 		switch (cmd) {

@@ -63,7 +63,8 @@ void main() {
 	ym_reset(true);
 	ym_reset(false);
 
-	/* LED */
+	// LED "breathing" animation (defaults used here)
+	// This could be changed based on what "mode" the firmware is in
 	led_init();
 	led_color(48, 96, 5);
 	led_blink(true, 200, 1000);
@@ -72,7 +73,7 @@ void main() {
 
 	puts("Configured LED for breathing..\n");
 
-	/* Enable USB directly */
+	// Original USB initialization. Need to sort out DFU issues.
 	serial_no_init();
 	usb_init(&app_stack_desc);
 	usb_dfu_rt_init();
@@ -96,7 +97,6 @@ void main() {
 		size_t length = ymu_data_poll(usb_data, &offset, &mode, 64);
 
 		if (length > 0) {
-			// FIXME: this may not work after playback started, check USB ctrl
 			playback_active = false;
 
 			switch (mode) {
@@ -120,7 +120,6 @@ void main() {
 			while (!ymu_report_status(64 << 16 | 32 << 8 | 48)) {}
 
 			vgm_init_playback();
-
 			playback_active = true;
 		}
 
