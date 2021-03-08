@@ -4,8 +4,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-#include <stdint.h>
-#include <stdbool.h>
 #include <stddef.h>
 
 #include "config.h"

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: MI
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifndef ym_ctrl_h
 #define ym_ctrl_h

@@ -60,7 +60,8 @@ void main() {
 	spi_mem_init();
 
 	pcm_mux_set_enabled(false);
-	ym_reset(true);
+
+	// It's expected that 192 cycles @ 8MHZ have passed since clear the reset
 	ym_reset(false);
 
 	// LED "breathing" animation (defaults used here)

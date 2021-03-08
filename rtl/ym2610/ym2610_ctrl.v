@@ -50,7 +50,8 @@ module ym2610_ctrl(
 	//
 	// Optimizing the shifter implementation isn't useful because the 2610 the bottleneck
 
-	wire [10:0] fifo_wdata = {5'b0, wb_addr[2:0], wb_wdata[7:0]};
+	// FIXME: 12bits where an extra bit flags that this is a reset
+	wire [10:0] fifo_wdata = {wb_addr[2:0], wb_wdata[7:0]};
 	wire fifo_we = wb_cyc && wb_we && !wb_ack && !fifo_full;
 	wire fifo_full;
 
@@ -82,9 +83,6 @@ module ym2610_ctrl(
 
 	// --- YM2610 control ---
 
-	// TODO: remove the below in favor of just using fifo
-	// set a busy_counter when data write finishes
-
 	// Write handling:
 
 	// 17 after addr
@@ -112,15 +110,14 @@ module ym2610_ctrl(
 		STATE_ADDRESS_SETUP = 0,
 		STATE_REG_WRITE = 1,
 		STATE_REG_WRITE_HOLD = 2,
-		STATE_WRITING = 4,
-		STATE_IDLE = 5;
+		STATE_WRITING = 3,
+		STATE_IDLE = 4;
 
 	wire busy = (state != STATE_IDLE);
 
 	reg [2:0] state;
 	reg [2:0] next_state;
 
-	reg write_begun;
 	reg ym_data_written;
 	reg shift_needs_load;
 
@@ -129,7 +126,6 @@ module ym2610_ctrl(
 
 	reg [7:0] reg_address_pending_write [0:1];
 	reg [7:0] reg_data_pending_write;
-	reg reg_address_writing;
 
 	reg [1:0] address_shift;
 	reg [7:0] din_shift;
@@ -139,17 +135,19 @@ module ym2610_ctrl(
 
 	always @(posedge clk) begin
 		if (reset) begin
+			ic_n_shift <= 0;
+			cs_n_shift <= 1;
+			wr_n_shift <= 1;
+
 			address_write <= 0;
 			din_write <= 0;
-			ic_n_shift <= 0;
 
-			write_begun <= 1;
-			shift_needs_load <= 0;
 			ym_data_written <= 0;
 
-			state <= STATE_ADDRESS_SETUP;
+			shift_needs_load <= 1;
+			state <= STATE_WRITING;
+			next_state <= STATE_IDLE;
 		end else begin
-			write_begun <= 0;
 			shift_needs_load <= 0;
 			ym_data_written <= 0;
 
@@ -161,19 +159,15 @@ module ym2610_ctrl(
 							din_write <= reg_address_pending_write[fifo_ym_address[1]];
 							reg_data_pending_write <= fifo_ym_data;
 
-							reg_address_writing <= 1;
-							write_begun <= 1;
-
 							state <= STATE_ADDRESS_SETUP;
 						end else begin
 							reg_address_pending_write[fifo_ym_address[1]] <= fifo_ym_data;
 						end
 					end else if (ym_reset_en) begin
-						ic_n_shift <= 0;
+						// Unconditionally clear reset, could add support to reset again if needed
+						ic_n_shift <= 1;
 						cs_n_shift <= 1;
 						wr_n_shift <= 1;
-
-						write_begun <= 1;
 
 						shift_needs_load <= 1;
 						state <= STATE_WRITING;
@@ -196,7 +190,7 @@ module ym2610_ctrl(
 					wr_n_shift <= 0;
 					din_shift <= din_write;
 
-					// Can't finish the write until write-delay is satisfied
+					// Can't start the write until write-delay is satisfied
 					if (!ym_data_busy) begin
 						shift_needs_load <= 1;
 						state <= STATE_WRITING;
@@ -204,17 +198,19 @@ module ym2610_ctrl(
 					end
 				end
 				STATE_REG_WRITE_HOLD: begin
-					// Needed to start the write-delay-counter
-					ym_data_written <= 1;
+					// Needed to start the write-delay-counter *only* for data writes
+					// Address writes are quick enough that no delay is needed
+					if (address_write[0]) begin
+						ym_data_written <= 1;
+					end
 
 					address_shift <= address_write;
 					cs_n_shift <= 1;
 					wr_n_shift <= 1;
 					din_shift <= din_write;
 
-					if (reg_address_writing) begin
+					if (!address_write[0]) begin
 						// Reg address will be written, write data next
-						reg_address_writing <= 0;
 						address_write[0] <= 1;
 						din_write <= reg_data_pending_write;
 
@@ -222,9 +218,6 @@ module ym2610_ctrl(
 					end else begin
 						// Reg address and data will be both written
 						next_state <= STATE_IDLE;
-
-						// The /IC input is only asserted on reset
-						ic_n_shift <= 1;
 					end
 
 					shift_needs_load <= 1;
@@ -272,7 +265,7 @@ module ym2610_ctrl(
 			awaiting_ym_clk_fall <= 0;
 		end else begin
 			shift_completed <= 0;
-			shift_load_r <= {shift_load_r[1:0], 1'b0};
+			shift_load_r <= shift_load_r << 1;
 
 			if (shift_needs_load) begin
 				shift <= shift_preload;
@@ -287,8 +280,9 @@ module ym2610_ctrl(
 				shift <= shift << 1;
 
 				if (shift_count == SHIFT_MSB) begin
-					shift_completed <= 1;
 					shift_load_r <= 3'b111;
+
+					shift_completed <= 1;
 					shifting <= 0;
 				end
 
