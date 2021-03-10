@@ -133,7 +133,7 @@ def poll_status(stopping_event, ep):
 	while not stopping_event.is_set():
 		print("Poll...")
 		try:
-			status_data = ep.read(4, 250)
+			status_data = ep.read(16, 250)
 			print("Received status data: ", status_data)
 		except usb.core.USBError as e:
 			# Swallowing exceptions like this is dirty but there are several coming in as "timeouts"
@@ -145,7 +145,7 @@ def start_polling_status(dev, ep):
 	thread = threading.Thread(target=poll_status, args=(stopping_event, ep))
 	thread.daemon = True
 	thread.start()
-	return stopping_event
+	return (thread, stopping_event)
 
 ###
 
@@ -251,17 +251,9 @@ dev.set_configuration()
 
 data_ep = get_data_ep(dev)
 status_ep = get_status_ep(dev)
-status_stopping_event = start_polling_status(dev, status_ep)
+(status_thread, status_stopping_event) = start_polling_status(dev, status_ep)
 
 # Read a VGM to send
-
-# filename = "ym2610/mag1.vgm"
-# filename = "ym2610/bossmag.vgm"
-# filename = "ym2610/magsub.vgm"
-# filename = "ym2610/golfu.vgm"
-# filename = "ym2610/golfintro.vgm"
-# filename = "ym2610/slug_st2.vgm"
-# filename = "ym2610/aof2big.vgm"
 
 filename = sys.argv[1]
 
@@ -278,5 +270,5 @@ while True:
 		time.sleep(0.5)
 	except KeyboardInterrupt:
 		status_stopping_event.set()
-		status_stopping_event.wait()
+		status_thread.join()
 		sys.exit(1)

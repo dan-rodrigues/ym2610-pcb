@@ -20,4 +20,3 @@ void spi_mem_init() {
 	const uint8_t QPI_ENABLE_CMD = 0x35;
 	*psram_cmd = QPI_ENABLE_CMD;
 }
-

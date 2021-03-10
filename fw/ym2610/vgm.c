@@ -22,6 +22,7 @@
 // Config:
 
 static const bool log_writes = false;
+static const bool log_pcm_write_blocks = false;
 
 static const bool enable_adpcm_a = true;
 static const bool enable_adpcm_b = true;
@@ -33,18 +34,12 @@ static const bool enable_dac_logging = false;
 static void dac_debug_log(void);
 static void mux_debug_log(void);
 
-static uint32_t read32(const uint8_t *bytes);
-
 static void vgm_player_sanity_check(void);
-static void vgm_player_init(void);
-static uint32_t vgm_player_update(void);
+static void vgm_player_init(struct vgm_player_context *context);
+static uint32_t vgm_player_update(struct vgm_player_context *ctx);
 static bool vgm_filter_reg_write(uint8_t port, uint8_t reg, uint8_t data);
 
-static size_t vgm_index;
-static size_t vgm_loop_offset;
-static uint32_t vgm_loop_count;
-
-// VGM buffer (independent of anything preloaded into fw)
+// VGM buffer
 static uint8_t vgm[0x18000];
 
 void vgm_write(uint8_t *data, size_t offset, size_t length) {
@@ -94,13 +89,15 @@ void vgm_pcm_write(uint32_t *data, size_t offset, size_t length) {
 		psram[i] = bytes;
 	}
 
-	printf("vgm_pcm_write: wrote pcm block (%x bytes @ %x)\n",
-		   length, offset);
+	if (log_pcm_write_blocks) {
+		printf("vgm_pcm_write: wrote pcm block (%x bytes @ %x)\n",
+			   length, offset);
+	}
 }
 
-void vgm_init_playback() {
+void vgm_init_playback(struct vgm_player_context *ctx) {
 	vgm_player_sanity_check();
-	vgm_player_init();
+	vgm_player_init(ctx);
 	vgm_timer_set(0);
 
 	// Don't allow PCM access to PSRAM until it's fully loaded
@@ -109,20 +106,29 @@ void vgm_init_playback() {
 	printf("Starting VGM playback...\n");
 }
 
-uint32_t vgm_continue_playback() {
+void vgm_continue_playback(struct vgm_player_context *ctx, struct vgm_update_result *result) {
 	if (!vgm_timer_elapsed()) {
-		return 0;
+		return;
 	}
 
-	uint32_t delay_ticks = vgm_player_update();
+	if (!ctx->initialized) {
+		printf("vgm_continue_playback: expected context to be initialized\n");
+		return;
+	}
+
+	uint32_t delay_ticks = vgm_player_update(ctx);
 	vgm_timer_set(delay_ticks);
+
+	// TODO: use updated index to configure update_result accordingly to request buffering if needed
+	result->buffering_needed = false;
+	result->buffer_target_offset = 0;
+	result->vgm_start_offset = 0;
+	result->vgm_chunk_length = 0;
 
 	if (enable_dac_logging) {
 		dac_debug_log();
 		mux_debug_log();
 	}
-
-	return delay_ticks;
 }
 
 static void dac_debug_log() {
@@ -161,7 +167,7 @@ static void vgm_player_sanity_check() {
 	}
 }
 
-static void vgm_player_init() {
+static void vgm_player_init(struct vgm_player_context *ctx) {
 	// VGM start offset
 
 	const size_t relative_offset_index = 0x34;
@@ -171,7 +177,7 @@ static void vgm_player_init() {
 	relative_offset |= vgm[relative_offset_index + 2] << 16;
 	relative_offset |= vgm[relative_offset_index + 3] << 24;
 
-	vgm_index = relative_offset ? relative_offset_index + relative_offset : 0x40;
+	ctx->index = relative_offset ? relative_offset_index + relative_offset : 0x40;
 
 	// VGM loop offset (optional
 
@@ -182,7 +188,7 @@ static void vgm_player_init() {
 	loop_offset |= vgm[loop_offset_index + 2] << 16;
 	loop_offset |= vgm[loop_offset_index + 3] << 24;
 
-	vgm_loop_offset = loop_offset ? loop_offset_index + loop_offset : 0;
+	ctx->loop_offset = loop_offset ? loop_offset_index + loop_offset : 0;
 
 	// YM2610 clock should always be 8MHz in this case, but read from header anyway
 
@@ -194,15 +200,73 @@ static void vgm_player_init() {
 
 	// Print some stats
 
-	printf("Start offset: 0x%08X\n", vgm_index);
-	printf("Loop offset:  0x%08X\n", vgm_loop_offset);
+	printf("Start offset: 0x%08X\n", ctx->index);
+	printf("Loop offset:  0x%08X\n", ctx->loop_offset);
 
 	printf("YM2610 clock: %dHz\n", ym_clock);
+
+	// Update attributes, not used unless buffering is needed
+
+	ctx->write_active = false;
+	ctx->target_offset = 0;
+	ctx->last_write_index = 0;
+	ctx->write_length = 0;
+
+	ctx->initialized = true;
 }
 
-static uint32_t vgm_player_update() {
+static uint8_t vgm_player_read_byte(struct vgm_player_context *ctx) {
+	// TODO: adjust pointers as needed according to context
+	// ... raise any buffer-needed flags etc.
+
+	// 80kbyte: fixed region at start (should include loop offset)
+	// 8kbyte:  buffer A
+	// 8kbyte:  buffer B
+	const uint32_t buffer_a_offset = 0x14000;
+	const uint32_t buffer_b_offset = 0x16000;
+	const uint32_t buffer_size = 0x2000;
+
+	uint8_t byte = vgm[ctx->index++];
+
+	// Nothing to do if we aren't in the double buffer region (yet)
+	if (ctx->index < buffer_a_offset) {
+		return byte;	
+	}
+
+	// ..did we just enter buffer A?
+	if (ctx->index == buffer_a_offset) {
+		// Start writing to B
+		ctx->write_active = true;
+		ctx->target_offset = buffer_b_offset;
+		ctx->write_length = buffer_size;
+		ctx->last_write_index = 0;
+
+	// ..did we just finish reading buffer A?
+	} else if (ctx->index == buffer_b_offset) {
+		// Start writing to A
+		ctx->write_active = true;
+		ctx->target_offset = buffer_a_offset;
+		ctx->write_length = buffer_size;
+		ctx->last_write_index = 0;
+
+	// ..did we read the final byte of buffer B?
+	} else if (ctx->index == (buffer_b_offset + buffer_size)) {
+		// Jump back to start of A
+		ctx->index = buffer_a_offset;
+
+		// Start writing to B
+		ctx->write_active = true;
+		ctx->target_offset = buffer_b_offset;
+		ctx->write_length = buffer_size;
+		ctx->last_write_index = 0;
+	}
+
+	return byte;
+}
+
+static uint32_t vgm_player_update(struct vgm_player_context *ctx) {
 	while (true) {
-		uint8_t cmd = vgm[vgm_index++];
+		uint8_t cmd = vgm_player_read_byte(ctx);
 
 		if ((cmd & 0xf0) == 0x70) {
 			// 0x7X
@@ -214,8 +278,8 @@ static uint32_t vgm_player_update() {
 			case 0x58: {
 				// 0x58 XX YY
 				// Write reg[0][XX] = YY
-				uint8_t reg = vgm[vgm_index++];
-				uint8_t data = vgm[vgm_index++];
+				uint8_t reg = vgm_player_read_byte(ctx);
+				uint8_t data = vgm_player_read_byte(ctx);
 
 				if (vgm_filter_reg_write(0, reg, data)) {
 					ym_write_a(reg, data);
@@ -224,8 +288,8 @@ static uint32_t vgm_player_update() {
 			case 0x59: {
 				// 0x59 XX YY
 				// Write reg[1][XX] = YY
-				uint8_t reg = vgm[vgm_index++];
-				uint8_t data = vgm[vgm_index++];
+				uint8_t reg = vgm_player_read_byte(ctx);
+				uint8_t data = vgm_player_read_byte(ctx);
 
 				if (vgm_filter_reg_write(1, reg, data)) {
 					ym_write_b(reg, data);
@@ -234,8 +298,8 @@ static uint32_t vgm_player_update() {
 			case 0x61: {
 				// 0x61 XX XX
 				// Wait XXXX samples
-				uint16_t delay = vgm[vgm_index++];
-				delay |= vgm[vgm_index++] << 8;
+				uint16_t delay = vgm_player_read_byte(ctx);
+				delay |= vgm_player_read_byte(ctx) << 8;
 				return delay;
 			}
 			case 0x62:
@@ -246,42 +310,27 @@ static uint32_t vgm_player_update() {
 				return 882;
 			case 0x66: {
 				// End of stream
-				vgm_loop_count++;
+				ctx->loop_count++;
 
-				if (vgm_loop_offset) {
-					vgm_index = vgm_loop_offset;
+				if (ctx->loop_offset) {
+					ctx->index = ctx->loop_offset;
 					printf("Looping..\n\n");
 				} else {
 					// If there's no loop, just restart the player
-					vgm_player_init();
+					vgm_player_init(ctx);
 					printf("Looping..\n\n");
 				}
 
 				return 0;
 			}
 
-			// Ignored commands to allow YM2xxx portion to play:
+			// Data blocks which should've been stripped out before playback started:
 
-			// OKI PCM:
+			case 0x67:
+				printf("Found PCM block during playback. These should've been removed. \n");
+				while(true) {}
 
-			case 0xb7: case 0xb8:
-				vgm_index += 2;
-				break;
-
-			// Sega PCM:
-
-			case 0xc0:
-				vgm_index += 3;
-				break;
-
-			// Data blocks:
-
-			case 0x67: {
-				size_t block_size = read32(&vgm[vgm_index + 2]);
-				vgm_index += 6 + block_size;
-
-				printf("Found PCM block during playback. Ignoring...\n");
-			} break;
+			// Other unsupported commands which we should never encounter:
 
 			default:
 				printf("Unsupported command: %X\n", cmd);
@@ -315,13 +364,4 @@ static bool vgm_filter_reg_write(uint8_t port, uint8_t reg, uint8_t data) {
 	}
 
 	return true;
-}
-
-static uint32_t read32(const uint8_t *bytes) {
-	uint32_t word = bytes[0];
-	word |= bytes[1] << 8;
-	word |= bytes[2] << 16;
-	word |= bytes[3] << 24;
-
-	return word;
 }

@@ -35,9 +35,9 @@
 #include "led.h"
 #include "mini-printf.h"
 #include "utils.h"
+
 #include "config.h"
 #include "ym_usb.h"
-
 #include "spi_mem.h"
 
 #include "ym2610/vgm.h"
@@ -61,7 +61,7 @@ void main() {
 
 	pcm_mux_set_enabled(false);
 
-	// It's expected that 192 cycles @ 8MHZ have passed since clear the reset
+	// It's expected that 192 cycles @ 8MHZ have passed since clearing the reset
 	ym_reset(false);
 
 	// LED "breathing" animation (defaults used here)
@@ -84,6 +84,12 @@ void main() {
 
 	playback_active = false;
 	puts("Entering main loop..\n");
+
+	// VGM player context / config
+
+	struct vgm_player_context player_context = {
+		.initialized = false
+	};
 
 	while (true) {
 		/* USB poll */
@@ -116,16 +122,24 @@ void main() {
 			}
 		}
 
-		if (ymu_playback_start_pending()) {
-			// status sending test
-			while (!ymu_report_status(64 << 16 | 32 << 8 | 48)) {}
+		if (playback_active) {
+			struct vgm_update_result result;
+			vgm_continue_playback(&player_context, &result);
 
-			vgm_init_playback();
-			playback_active = true;
+			if (result.buffering_needed) {
+				printf("main loop: requesting buffering @ %x, vgm range %x to %x, %x bytes\n",
+						result.buffer_target_offset, result.vgm_start_offset, result.vgm_chunk_length);
+
+				ymu_request_vgm_buffering(result.buffer_target_offset, result.vgm_start_offset, result.vgm_chunk_length);
+			}
 		}
 
-		if (playback_active) {
-			/*uint32_t previous_delay = */ vgm_continue_playback();
+		if (ymu_playback_start_pending()) {
+			// Temporary test of status reporting
+			while (!ymu_report_status(64 << 16 | 32 << 8 | 48)) {}
+
+			vgm_init_playback(&player_context);
+			playback_active = true;
 		}
 	}
 }

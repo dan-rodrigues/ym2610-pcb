@@ -22,7 +22,7 @@ size_t ymu_data_poll(uint32_t *data, size_t *offset, enum ymu_write_mode *mode, 
 void ymu_init(void);
 bool ymu_playback_start_pending(void);
 
+bool ymu_request_vgm_buffering(uint32_t target_offset, uint32_t vgm_start_offset, uint32_t vgm_chunk_length);
 bool ymu_report_status(uint32_t status);
 
 #endif
-

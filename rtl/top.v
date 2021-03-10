@@ -95,7 +95,6 @@ module top(
 	reg [1:0] boot_sel;
 
 	// Clock / Reset logic
-	wire clk_8m;
 	wire clk_24m;
 	wire clk_48m;
 	wire rst;
@@ -577,8 +576,6 @@ module top(
 	// 8MHz clock generation (for YM2610 + shifters)
 
 	localparam [5:0] CLK_8M_PATTERN = 6'b111000;
-
-	assign clk_8m = clk_24m;
 
 	reg [2:0] clk8m_shift_n;
 	reg [2:0] clk8m_shift_p;

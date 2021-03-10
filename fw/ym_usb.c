@@ -73,6 +73,52 @@ static void ymu_enable_write() {
 	usb_ep_regs[2].out.bd[1].csr = USB_BD_STATE_RDY_DATA | USB_BD_LEN(64);
 }
 
+bool ymu_request_vgm_buffering(uint32_t target_offset, uint32_t vgm_start_offset, uint32_t vgm_chunk_length) {
+	uint32_t csr = usb_ep_regs[3].in.bd[0].csr;
+	uint32_t state = csr & USB_BD_STATE_MSK;
+
+	if (state == USB_BD_STATE_RDY_DATA) {
+		printf("ymu_request_vgm_buffering: request send pending...\n");
+		return false;
+	}
+
+	uint32_t buffer_offset = 1280;
+
+	const uint32_t buffer_request_header = 0x1234567;
+ 
+	usb_data_write(buffer_offset + 0, &buffer_request_header, 4);
+	usb_data_write(buffer_offset + 4, &target_offset, 4);
+	usb_data_write(buffer_offset + 8, &vgm_start_offset, 4);
+	usb_data_write(buffer_offset + 12, &vgm_chunk_length, 4);
+
+	usb_ep_regs[3].in.bd[0].ptr = buffer_offset;
+	usb_ep_regs[3].in.bd[0].csr = USB_BD_STATE_RDY_DATA | USB_BD_LEN(16);
+
+	return true;
+}
+
+// FIXME: unify these two
+bool ymu_report_status(uint32_t status) {
+	uint32_t csr = usb_ep_regs[3].in.bd[0].csr;
+	uint32_t state = csr & USB_BD_STATE_MSK;
+
+	if (state == USB_BD_STATE_RDY_DATA) {
+		printf("Status send pending...\n");
+		return false;
+	}
+
+	const uint32_t status_header = 0x89abcdef;
+
+	uint32_t buffer_offset = 1280;
+ 
+	usb_data_write(buffer_offset, &status_header, 4);
+	// other 12 bytes?
+	usb_ep_regs[3].in.bd[0].ptr = buffer_offset;
+	usb_ep_regs[3].in.bd[0].csr = USB_BD_STATE_RDY_DATA | USB_BD_LEN(16);
+
+	return true;
+}
+
 // Only 32bit aligned addresses seem to be handled by usb_data_read()
 
 size_t ymu_data_poll(uint32_t *data, size_t *offset, enum ymu_write_mode *mode, size_t max_length) {
@@ -132,24 +178,6 @@ size_t ymu_data_poll(uint32_t *data, size_t *offset, enum ymu_write_mode *mode, 
 	bd_index ^= 1;
 
 	return len;
-}
-
-bool ymu_report_status(uint32_t status) {
-	uint32_t csr = usb_ep_regs[3].in.bd[0].csr;
-	uint32_t state = csr & USB_BD_STATE_MSK;
-
-	if (state == USB_BD_STATE_RDY_DATA) {
-		printf("Status send pending...\n");
-		return false;
-	}
-
-	uint32_t buffer_offset = 1280;
- 
-		usb_data_write(buffer_offset, &status, 4);
-		usb_ep_regs[3].in.bd[0].ptr = buffer_offset;
-		usb_ep_regs[3].in.bd[0].csr = USB_BD_STATE_RDY_DATA | USB_BD_LEN(4);
-
-	return true;
 }
 
 bool ymu_playback_start_pending() {
