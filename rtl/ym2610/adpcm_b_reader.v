@@ -115,7 +115,7 @@ module adpcm_b_reader #(
 	always @* begin
 		if (reset) begin
 			pcm_mux_needed = 0;
-		end else if (pmpx_rose) begin
+		end else if (pmpx_rose || pcm_mem_ready) begin
 			pcm_mux_needed = 1;
 		end else begin
 			case (state)
@@ -143,6 +143,23 @@ module adpcm_b_reader #(
 
 	// PCM mux selection:
 
+	localparam [1:0]
+		MUX_SRC_ADDRESS = 0,
+		MUX_SRC_PCM_READ = 1,
+		MUX_SRC_PCM_WRITE = 2;
+
+	reg [1:0] mux_src;
+
+	always @* begin
+		if (pmpx_rose || (state == S_ADDRESS_READING)) begin
+			mux_src = MUX_SRC_ADDRESS;
+		end else if (pcm_mem_ready || (state == S_PCM_WRITING)) begin
+			mux_src = MUX_SRC_PCM_WRITE;
+		end else begin
+			mux_src = MUX_SRC_PCM_READ;
+		end
+	end
+
 	always @* begin
 		mux_sel_nx = 0;
 		mux_oe_n_nx = 1;
@@ -150,29 +167,24 @@ module adpcm_b_reader #(
 		ym_io_out_nx = 0;
 		ym_io_en_nx = 0;
 
-		if (pmpx_rose) begin
-			mux_sel_nx = ar_mux_sel_nx;
-			mux_oe_n_nx = ar_mux_oe_n_nx;
-		end else begin
-			case (state)
-				S_ADDRESS_READING: begin
-					mux_sel_nx = ar_mux_sel_nx;
-					mux_oe_n_nx = ar_mux_oe_n_nx;
-				end
-				S_PCM_READING: begin
-					mux_sel_nx = pr_mux_sel_nx;
-					mux_oe_n_nx = pr_mux_oe_n_nx;
-				end
-				S_PCM_WRITING: begin
-					mux_sel_nx = pw_mux_sel_nx;
-					mux_oe_n_nx = pw_mux_oe_n_nx;
-					ym_io_en_nx = pw_ym_io_en_nx;
+		case (mux_src)
+			MUX_SRC_ADDRESS: begin
+				mux_sel_nx = ar_mux_sel_nx;
+				mux_oe_n_nx = ar_mux_oe_n_nx;
+			end
+			MUX_SRC_PCM_READ: begin
+				mux_sel_nx = pr_mux_sel_nx;
+				mux_oe_n_nx = pr_mux_oe_n_nx;
+			end
+			MUX_SRC_PCM_WRITE: begin
+				mux_sel_nx = pw_mux_sel_nx;
+				mux_oe_n_nx = pw_mux_oe_n_nx;
+				ym_io_en_nx = pw_ym_io_en_nx;
 
-					pcm_load_nx = pw_pcm_load_nx;
-					ym_io_out_nx = pw_ym_io_out_nx;
-				end
-			endcase
-		end
+				pcm_load_nx = pw_pcm_load_nx;
+				ym_io_out_nx = pw_ym_io_out_nx;
+			end
+		endcase
 	end
 
 	// PCM address reading output:
@@ -205,8 +217,8 @@ module adpcm_b_reader #(
 					ar_mux_oe_n_nx = 0;
 				end
 				// Address high
-				2, 3, 4: begin
-					// 3 cycles while we wait for data to change to PMPX-fall output (hi address)
+				2, 3, 4, 5: begin
+					// 4 cycles while we wait for data to change to PMPX-fall output (hi address)
 					// We access it before the falling edge to buy time though
 					// This was previously 2 cycles delay only but that is right on the edge
 					// +1 cycle to give a bit more time for address to settle
@@ -214,11 +226,11 @@ module adpcm_b_reader #(
 					ar_mux_sel_nx = MUX_SEL_PAD3_0;
 					ar_mux_oe_n_nx = 0;
 				end
-				5: begin
+				6: begin
 					ar_mux_sel_nx = MUX_SEL_PAD7_4;
 					ar_mux_oe_n_nx = 0;
 				end
-				6: begin
+				7: begin
 					ar_mux_sel_nx = MUX_SEL_PA11_8;
 					ar_mux_oe_n_nx = 0;
 				end
@@ -247,17 +259,17 @@ module adpcm_b_reader #(
 			3: begin
 				pcm_mem_addr_base[11:8] <= ym_io_in;
 			end
-			4, 5: begin
+			4, 5, 6: begin
 				// ...waiting for the second set of signals to appear
 				// This might need tweaking
 			end
-			6: begin
+			7: begin
 				pcm_mem_addr_base[15:12] <= ym_io_in;
 			end
-			7: begin
+			8: begin
 				pcm_mem_addr_base[19:16] <= ym_io_in;
 			end
-			8: begin
+			9: begin
 				pcm_mem_addr_base[23:20] <= ym_io_in;
 				address_read_complete <= 1;
 			end
@@ -271,16 +283,8 @@ module adpcm_b_reader #(
 
 	always @* begin
 		// address_read_complete brings the pcm_mem_valid output 1 cycle earlier
-		// The 24bit address is already valid at this
+		// The 24bit address is already valid at this stage
 		pcm_mem_valid = address_read_complete || (state == S_PCM_READING);
-	end
-
-	reg [7:0] pcm;
-
-	always @(posedge clk) begin
-		if (pcm_mem_ready) begin
-			pcm <= pcm_mem_rdata;
-		end
 	end
 
 	// PCM write handling:
@@ -291,6 +295,7 @@ module adpcm_b_reader #(
 		if (state_changing_to(S_PCM_WRITING)) begin
 			write_state <= 0;
 		end else if (state == S_PCM_WRITING) begin
+			// condition is redundant?
 			write_state <= write_state + 1;
 		end
 	end	
@@ -303,6 +308,46 @@ module adpcm_b_reader #(
 
 	reg write_complete;
 
+	reg [7:0] pcm;
+
+	always @(posedge clk) begin
+		if (pcm_mem_ready) begin
+			pcm <= pcm_mem_rdata;
+		end
+	end
+
+	localparam [1:0]
+		PCM_WRITE_LO_SETUP = 0,
+		PCM_WRITE_LO_HOLD = 1,
+		PCM_WRITE_HI_SETUP = 2,
+		PCM_WRITE_HI_HOLD = 3;
+
+	reg [1:0] pcm_write_step;
+
+	always @* begin
+		pcm_write_step = PCM_WRITE_LO_SETUP;
+
+		if (pcm_mem_ready) begin
+			// First step: Low nybble: setup + LE high
+			pcm_write_step = PCM_WRITE_LO_SETUP;
+		end else begin
+			case (write_state)
+				0: begin
+					// Low nybble: hold + LE low
+					pcm_write_step = PCM_WRITE_LO_HOLD;
+				end
+				1: begin
+					// High nybble: setup + LE high
+					pcm_write_step = PCM_WRITE_HI_SETUP;
+				end
+				2: begin
+					// High nybble: hold + LE low
+					pcm_write_step = PCM_WRITE_HI_HOLD;
+				end
+			endcase
+		end
+	end
+
 	always @* begin
 		pw_mux_sel_nx = 0;
 		pw_mux_oe_n_nx = 1;
@@ -311,28 +356,23 @@ module adpcm_b_reader #(
 		pw_ym_io_en_nx = 1;
 		pw_ym_io_out_nx = 0;
 
-		case (write_state)
-			0: begin
-				// Low nybble: setup + LE high
+		case (pcm_write_step)
+			PCM_WRITE_LO_SETUP: begin
 				pw_mux_sel_nx = 3'b101;
-				pw_ym_io_out_nx = pcm[3:0];
+				pw_ym_io_out_nx = pcm_mem_rdata[3:0];
 			end
-			1: begin
-				// Low nybble: hold + LE low
+			PCM_WRITE_LO_HOLD: begin
 				pw_mux_sel_nx = 3'b100;
 				pw_ym_io_out_nx = pcm[3:0];
 			end
-			2: begin
-				// High nybble: setup + LE high
+			PCM_WRITE_HI_SETUP: begin
 				pw_mux_sel_nx = 3'b100;
 				pw_ym_io_out_nx = pcm[7:4];
 				pw_pcm_load_nx = 1;
 			end
-			3: begin
-				// High nybble: hold + LE low
+			PCM_WRITE_HI_HOLD: begin
 				pw_mux_sel_nx = 3'b100;
 				pw_ym_io_out_nx = pcm[7:4];
-				pw_pcm_load_nx = 0;
 
 				write_complete = 1;
 			end

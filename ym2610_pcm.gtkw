@@ -1,21 +1,22 @@
 [*]
 [*] GTKWave Analyzer v3.3.107 (w)1999-2020 BSI
-[*] Sun Mar  7 00:53:26 2021
+[*] Fri Mar 12 12:03:05 2021
 [*]
 [dumpfile] "/Users/dan.rodrigues/hw/ym2610-pmod/build-tmp/ym_tb.vcd"
-[dumpfile_mtime] "Sat Mar  6 23:03:29 2021"
-[dumpfile_size] 8290997
+[dumpfile_mtime] "Fri Mar 12 11:50:46 2021"
+[dumpfile_size] 7347054
 [savefile] "/Users/dan.rodrigues/hw/ym2610-pmod/ym2610_pcm.gtkw"
-[timestart] 181320000
+[timestart] 189906400
 [size] 1792 1036
 [pos] -1 -1
-*-21.000000 187622520 11316120 10566000 11816280 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-17.000000 190227520 11316120 10566000 11816280 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] ym_tb.
 [treeopen] ym_tb.dut_I.
+[treeopen] ym_tb.dut_I.ym2610_pcm_mux_ctrl.
 [sst_width] 302
 [signals_width] 296
 [sst_expanded] 1
-[sst_vpaned_height] 416
+[sst_vpaned_height] 662
 @28
 ym_tb.dut_I.spi_mem.clk
 ym_tb.dut_I.spi_mem.clk_2x
@@ -26,6 +27,25 @@ ym_tb.dut_I.spi_mem.mem_addr[23:0]
 @200
 -
 -
+@28
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.mux_sel[2:0]
+@22
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.ym_io[3:0]
+@200
+-
+@28
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.mux_sel_nx[2:0]
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.ym_io_en_nx
+@22
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.ym_io_in[3:0]
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.ym_io_out_nx[3:0]
+@200
+-
+-
+@29
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.pmpx_rose
+@28
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.pw_mux_sel_nx[2:0]
 @800200
 -adpcm_a
 @c00022
@@ -83,15 +103,25 @@ ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.rmpx_fell
 -
 @28
 ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_a_reader.state[2:0]
+@200
+-
+-
+@22
+ym_tb.ym2160_pcm_mux.pad[7:0]
+@28
+ym_tb.ym2160_pcm_mux.pcm_load
+@22
+ym_tb.ym2160_pcm_mux.pcm_nybble[3:0]
+ym_tb.ym2160_pcm_mux.pcm_p[7:0]
+ym_tb.ym2160_pcm_mux.pcm_r[7:0]
 @1000200
 -adpcm_a
 @200
 -
 @800200
 -adpcm_b
-@200
--
 @22
+ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.pcm_mem_rdata[7:0]
 ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.pcm_mem_addr[23:0]
 @28
 ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.pcm_mem_ready
@@ -107,7 +137,7 @@ ym_tb.dut_I.ym2610_pcm_mux_ctrl.adpcm_b_reader.read_active
 -adpcm_b
 @200
 -
-@c00200
+@800200
 -spi_mem
 @28
 ym_tb.dut_I.spi_mem.mem_valid
@@ -118,7 +148,7 @@ ym_tb.dut_I.spi_mem.state[3:0]
 @28
 ym_tb.dut_I.spi_mem.spi_csn[1:0]
 ym_tb.dut_I.spi_mem.spi_clk
-@1401200
+@1000200
 -spi_mem
 @200
 -
@@ -140,9 +170,8 @@ ym_tb.ym2610.pad[7:0]
 ym_tb.ym2610.poe
 @200
 -
-@29
-ym_tb.ym2160_pcm_mux.rmpx
 @28
+ym_tb.ym2160_pcm_mux.rmpx
 ym_tb.ym2610.roe
 @200
 -
