@@ -35,6 +35,8 @@ static bool playback_start_pending;
 static void ymu_enable_write(void);
 static void ymu_disable_write(void);
 
+static bool ymu_send_status(const uint32_t *status);
+
 enum ymu_ctrl_req {
 	YMU_CTRL_READ_STATUS = 0x80,
 
@@ -73,23 +75,19 @@ static void ymu_enable_write() {
 	usb_ep_regs[2].out.bd[1].csr = USB_BD_STATE_RDY_DATA | USB_BD_LEN(64);
 }
 
-bool ymu_request_vgm_buffering(uint32_t target_offset, uint32_t vgm_start_offset, uint32_t vgm_chunk_length) {
+// FIXME: try again if request is stalled for whatever reason
+// or spin if there's no waiting, pretty unlikely to be an event pending except for bugs
+static bool ymu_send_status(const uint32_t *status) {
 	uint32_t csr = usb_ep_regs[3].in.bd[0].csr;
 	uint32_t state = csr & USB_BD_STATE_MSK;
 
 	if (state == USB_BD_STATE_RDY_DATA) {
-		printf("ymu_request_vgm_buffering: request send pending...\n");
+		printf("ymu_send_status: data pending...\n");
 		return false;
 	}
 
 	uint32_t buffer_offset = 1280;
-
-	const uint32_t buffer_request_header = 0x1234567;
- 
-	usb_data_write(buffer_offset + 0, &buffer_request_header, 4);
-	usb_data_write(buffer_offset + 4, &target_offset, 4);
-	usb_data_write(buffer_offset + 8, &vgm_start_offset, 4);
-	usb_data_write(buffer_offset + 12, &vgm_chunk_length, 4);
+	usb_data_write(buffer_offset, status, 16);
 
 	usb_ep_regs[3].in.bd[0].ptr = buffer_offset;
 	usb_ep_regs[3].in.bd[0].csr = USB_BD_STATE_RDY_DATA | USB_BD_LEN(16);
@@ -97,26 +95,26 @@ bool ymu_request_vgm_buffering(uint32_t target_offset, uint32_t vgm_start_offset
 	return true;
 }
 
-// FIXME: unify these two
+bool ymu_request_vgm_buffering(uint32_t target_offset, uint32_t vgm_start_offset, uint32_t vgm_chunk_length) {
+	const uint32_t buffer_request_header = 0x01;
+	const uint32_t data[4] = {
+		buffer_request_header,
+		target_offset,
+		vgm_start_offset,
+		vgm_chunk_length
+	};
+
+	return ymu_send_status(data);
+}
+
 bool ymu_report_status(uint32_t status) {
-	uint32_t csr = usb_ep_regs[3].in.bd[0].csr;
-	uint32_t state = csr & USB_BD_STATE_MSK;
+	const uint32_t status_header = 0x02;
+	const uint32_t data[4] = {
+		status_header,
+		0, 0, 0
+	};
 
-	if (state == USB_BD_STATE_RDY_DATA) {
-		printf("Status send pending...\n");
-		return false;
-	}
-
-	const uint32_t status_header = 0x89abcdef;
-
-	uint32_t buffer_offset = 1280;
- 
-	usb_data_write(buffer_offset, &status_header, 4);
-	// other 12 bytes?
-	usb_ep_regs[3].in.bd[0].ptr = buffer_offset;
-	usb_ep_regs[3].in.bd[0].csr = USB_BD_STATE_RDY_DATA | USB_BD_LEN(16);
-
-	return true;
+	return ymu_send_status(data);
 }
 
 // Only 32bit aligned addresses seem to be handled by usb_data_read()

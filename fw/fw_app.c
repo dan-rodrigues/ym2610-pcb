@@ -87,12 +87,11 @@ void main() {
 
 	// VGM player context / config
 
-	struct vgm_player_context player_context = {
+	struct vgm_player_context player_ctx = {
 		.initialized = false
 	};
 
 	while (true) {
-		/* USB poll */
 		usb_poll();
 
 		// VGM USB control / data poll
@@ -104,16 +103,17 @@ void main() {
 		size_t length = ymu_data_poll(usb_data, &offset, &mode, 64);
 
 		if (length > 0) {
-			playback_active = false;
-
 			switch (mode) {
 				case YMU_WM_VGM:
 					vgm_write((uint8_t *)usb_data, offset, length);
+					player_ctx.last_write_index = offset + length;
 					break;
 				case YMU_WM_PCM_A:
+					playback_active = false;
 					vgm_pcm_write(usb_data, offset, length);
 					break;
 				case YMU_WM_PCM_B:
+					playback_active = false;
 					vgm_pcm_write(usb_data, 0 + offset, length);
 					break;
 				case YMU_WM_UNDEFINED:
@@ -124,21 +124,22 @@ void main() {
 
 		if (playback_active) {
 			struct vgm_update_result result;
-			vgm_continue_playback(&player_context, &result);
+			vgm_continue_playback(&player_ctx, &result);
 
 			if (result.buffering_needed) {
-				printf("main loop: requesting buffering @ %x, vgm range %x to %x, %x bytes\n",
+				printf("main loop: requesting buffering @ %x, vgm range %x, %x bytes\n",
 						result.buffer_target_offset, result.vgm_start_offset, result.vgm_chunk_length);
 
-				ymu_request_vgm_buffering(result.buffer_target_offset, result.vgm_start_offset, result.vgm_chunk_length);
+				ymu_request_vgm_buffering(
+					result.buffer_target_offset,
+					result.vgm_start_offset,
+					result.vgm_chunk_length
+				);
 			}
 		}
 
 		if (ymu_playback_start_pending()) {
-			// Temporary test of status reporting
-			while (!ymu_report_status(64 << 16 | 32 << 8 | 48)) {}
-
-			vgm_init_playback(&player_context);
+			vgm_init_playback(&player_ctx);
 			playback_active = true;
 		}
 	}

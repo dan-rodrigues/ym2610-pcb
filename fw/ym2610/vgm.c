@@ -36,29 +36,38 @@ static void mux_debug_log(void);
 
 static void vgm_player_sanity_check(void);
 static void vgm_player_init(struct vgm_player_context *context);
-static uint32_t vgm_player_update(struct vgm_player_context *ctx);
+static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_update_result *result);
 static bool vgm_filter_reg_write(uint8_t port, uint8_t reg, uint8_t data);
 
 // VGM buffer
 static uint8_t vgm[0x18000];
 
+static bool bounds_error_logged = false;
+
+__attribute__((noinline))
 void vgm_write(uint8_t *data, size_t offset, size_t length) {
 	if (length == 0) {
 		printf("vgm_write: expected non-zero length\n");
 		return;
 	}
 
-	if ((offset + length) >= sizeof(vgm)) {
-		printf("vgm_write: expected data to be within vgm buffer bounds\n");
+	if ((offset + length) > sizeof(vgm)) {
+		if (!bounds_error_logged) {
+			printf("vgm_write: expected data to be within vgm buffer bounds\n");
+			bounds_error_logged = true;
+		}
 		return;
 	}
 
+	// FIXME: optimise
 	for (size_t i = 0; i < length; i++) {
 		vgm[offset + i] = data[i];
 	}
 
-	printf("vgm_write: wrote vgm block (%x bytes @ %x)\n",
-		   length, offset);
+	if (log_writes) {
+		printf("vgm_write: wrote vgm block (%x bytes @ %x)\n",
+			   length, offset);
+	}
 }
 
 void vgm_pcm_write(uint32_t *data, size_t offset, size_t length) {
@@ -107,6 +116,8 @@ void vgm_init_playback(struct vgm_player_context *ctx) {
 }
 
 void vgm_continue_playback(struct vgm_player_context *ctx, struct vgm_update_result *result) {
+	result->buffering_needed = false;
+
 	if (!vgm_timer_elapsed()) {
 		return;
 	}
@@ -116,14 +127,8 @@ void vgm_continue_playback(struct vgm_player_context *ctx, struct vgm_update_res
 		return;
 	}
 
-	uint32_t delay_ticks = vgm_player_update(ctx);
+	uint32_t delay_ticks = vgm_player_update(ctx, result);
 	vgm_timer_set(delay_ticks);
-
-	// TODO: use updated index to configure update_result accordingly to request buffering if needed
-	result->buffering_needed = false;
-	result->buffer_target_offset = 0;
-	result->vgm_start_offset = 0;
-	result->vgm_chunk_length = 0;
 
 	if (enable_dac_logging) {
 		dac_debug_log();
@@ -178,6 +183,7 @@ static void vgm_player_init(struct vgm_player_context *ctx) {
 	relative_offset |= vgm[relative_offset_index + 3] << 24;
 
 	ctx->index = relative_offset ? relative_offset_index + relative_offset : 0x40;
+	ctx->buffer_index = ctx->index;
 
 	// VGM loop offset (optional
 
@@ -207,18 +213,12 @@ static void vgm_player_init(struct vgm_player_context *ctx) {
 
 	// Update attributes, not used unless buffering is needed
 
-	ctx->write_active = false;
-	ctx->target_offset = 0;
-	ctx->last_write_index = 0;
-	ctx->write_length = 0;
-
 	ctx->initialized = true;
+	ctx->write_active = false;
+	ctx->last_write_index = 0;
 }
 
-static uint8_t vgm_player_read_byte(struct vgm_player_context *ctx) {
-	// TODO: adjust pointers as needed according to context
-	// ... raise any buffer-needed flags etc.
-
+static uint8_t vgm_player_read_byte(struct vgm_player_context *ctx, struct vgm_update_result *result) {
 	// 80kbyte: fixed region at start (should include loop offset)
 	// 8kbyte:  buffer A
 	// 8kbyte:  buffer B
@@ -226,47 +226,52 @@ static uint8_t vgm_player_read_byte(struct vgm_player_context *ctx) {
 	const uint32_t buffer_b_offset = 0x16000;
 	const uint32_t buffer_size = 0x2000;
 
-	uint8_t byte = vgm[ctx->index++];
+	uint8_t byte = vgm[ctx->buffer_index++];
+	ctx->index++;
 
 	// Nothing to do if we aren't in the double buffer region (yet)
 	if (ctx->index < buffer_a_offset) {
 		return byte;	
 	}
-
 	// ..did we just enter buffer A?
-	if (ctx->index == buffer_a_offset) {
+	if (ctx->buffer_index == buffer_a_offset) {
 		// Start writing to B
-		ctx->write_active = true;
-		ctx->target_offset = buffer_b_offset;
-		ctx->write_length = buffer_size;
-		ctx->last_write_index = 0;
-
+		result->buffering_needed = true;
+		result->buffer_target_offset = buffer_b_offset;
+		result->vgm_start_offset = ctx->index + buffer_size;
+		result->vgm_chunk_length = buffer_size;
 	// ..did we just finish reading buffer A?
-	} else if (ctx->index == buffer_b_offset) {
+	} else if (ctx->buffer_index == buffer_b_offset) {
 		// Start writing to A
-		ctx->write_active = true;
-		ctx->target_offset = buffer_a_offset;
-		ctx->write_length = buffer_size;
-		ctx->last_write_index = 0;
-
+		result->buffering_needed = true;
+		result->buffer_target_offset = buffer_a_offset;
+		result->vgm_start_offset = ctx->index + buffer_size;
+		result->vgm_chunk_length = buffer_size;
 	// ..did we read the final byte of buffer B?
-	} else if (ctx->index == (buffer_b_offset + buffer_size)) {
+	} else if (ctx->buffer_index == (buffer_b_offset + buffer_size)) {
 		// Jump back to start of A
-		ctx->index = buffer_a_offset;
+		ctx->buffer_index = buffer_a_offset;
 
 		// Start writing to B
-		ctx->write_active = true;
-		ctx->target_offset = buffer_b_offset;
-		ctx->write_length = buffer_size;
-		ctx->last_write_index = 0;
+		result->buffering_needed = true;
+		result->buffer_target_offset = buffer_b_offset;
+		result->vgm_start_offset = ctx->index + buffer_size;
+		result->vgm_chunk_length = buffer_size;
 	}
 
 	return byte;
 }
 
-static uint32_t vgm_player_update(struct vgm_player_context *ctx) {
+static void vgm_reset_initial_buffer(struct vgm_update_result *result) {
+	result->buffering_needed = true;
+	result->buffer_target_offset = 0x14000;
+	result->vgm_start_offset = 0x14000;
+	result->vgm_chunk_length = 0x2000;
+}
+
+static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_update_result *result) {
 	while (true) {
-		uint8_t cmd = vgm_player_read_byte(ctx);
+		uint8_t cmd = vgm_player_read_byte(ctx, result);
 
 		if ((cmd & 0xf0) == 0x70) {
 			// 0x7X
@@ -278,8 +283,8 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx) {
 			case 0x58: {
 				// 0x58 XX YY
 				// Write reg[0][XX] = YY
-				uint8_t reg = vgm_player_read_byte(ctx);
-				uint8_t data = vgm_player_read_byte(ctx);
+				uint8_t reg = vgm_player_read_byte(ctx, result);
+				uint8_t data = vgm_player_read_byte(ctx, result);
 
 				if (vgm_filter_reg_write(0, reg, data)) {
 					ym_write_a(reg, data);
@@ -288,8 +293,8 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx) {
 			case 0x59: {
 				// 0x59 XX YY
 				// Write reg[1][XX] = YY
-				uint8_t reg = vgm_player_read_byte(ctx);
-				uint8_t data = vgm_player_read_byte(ctx);
+				uint8_t reg = vgm_player_read_byte(ctx, result);
+				uint8_t data = vgm_player_read_byte(ctx, result);
 
 				if (vgm_filter_reg_write(1, reg, data)) {
 					ym_write_b(reg, data);
@@ -298,8 +303,8 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx) {
 			case 0x61: {
 				// 0x61 XX XX
 				// Wait XXXX samples
-				uint16_t delay = vgm_player_read_byte(ctx);
-				delay |= vgm_player_read_byte(ctx) << 8;
+				uint16_t delay = vgm_player_read_byte(ctx, result);
+				delay |= vgm_player_read_byte(ctx, result) << 8;
 				return delay;
 			}
 			case 0x62:
@@ -314,12 +319,15 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx) {
 
 				if (ctx->loop_offset) {
 					ctx->index = ctx->loop_offset;
+					ctx->buffer_index = ctx->index;
 					printf("Looping..\n\n");
 				} else {
 					// If there's no loop, just restart the player
 					vgm_player_init(ctx);
 					printf("Looping..\n\n");
 				}
+
+				vgm_reset_initial_buffer(result);
 
 				return 0;
 			}
@@ -333,7 +341,8 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx) {
 			// Other unsupported commands which we should never encounter:
 
 			default:
-				printf("Unsupported command: %X\n", cmd);
+				printf("Unsupported command: %x, buffer index: %x, vgm index: %x\n",
+					   cmd, (ctx->buffer_index - 1), (ctx->index - 1));
 				while(true) {}
 		}
 	}

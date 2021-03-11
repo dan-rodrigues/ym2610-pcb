@@ -10,13 +10,12 @@
 struct vgm_player_context {
 	bool initialized;
 	uint32_t index;
+	uint32_t buffer_index;
 	uint32_t loop_offset;
 	uint32_t loop_count;
 
 	bool write_active;
-	uint32_t target_offset;
 	uint32_t last_write_index;
-	uint32_t write_length;
 };
 
 struct vgm_update_result {
