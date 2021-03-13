@@ -39,10 +39,12 @@
 #include "config.h"
 #include "ym_usb.h"
 #include "spi_mem.h"
+#include "midi.h"
 
 #include "ym2610/vgm.h"
 #include "ym2610/ym_ctrl.h"
 #include "ym2610/pcm_mux.h"
+#include "ym2610/fm.h"
 
 extern const struct usb_stack_descriptors app_stack_desc;
 
@@ -58,6 +60,7 @@ void main() {
 	puts("Entered main..\n");
 
 	spi_mem_init();
+	midi_init();
 
 	pcm_mux_set_enabled(false);
 
@@ -88,8 +91,14 @@ void main() {
 	// VGM player context / config
 
 	struct vgm_player_context player_ctx = {
-		.initialized = false
+		.initialized = false,
+		// Config, can set at run time later
+		.filter_fm_key_on = true,
+		.filter_fm_pitch = true
 	};
+
+	struct fm_ctx fm_ctx;
+	fm_init(&fm_ctx);
 
 	while (true) {
 		usb_poll();
@@ -141,6 +150,20 @@ void main() {
 		if (ymu_playback_start_pending()) {
 			vgm_init_playback(&player_ctx);
 			playback_active = true;
+		}
+
+		// MIDI:
+
+		struct midi_msg midi_msg = { 0 };
+		while (midi_pending_msg(&midi_msg)) {
+			printf("main loop: received MIDI message of type %x\n", midi_msg.cmd);
+
+			const uint8_t ch = 5;
+			const uint8_t ch_mask = 1 << ch | 1 << 4 | 1 << 6;
+
+			bool key_on = midi_msg.cmd == MIDI_CMD_NOTE_ON;
+
+			fm_key_mask(&fm_ctx, ch_mask, key_on, midi_msg.note_ctx.note);
 		}
 	}
 }

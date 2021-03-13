@@ -14,6 +14,14 @@
 static volatile uint32_t * const ym2610_ctrl = (void*)(YM2610_BASE);
 static void ym_busy_wait(void);
 
+void ym_write(uint16_t reg, uint8_t data) {
+	if (reg & 0x100) {
+		ym_write_b(reg & 0xff, data);
+	} else {
+		ym_write_a(reg & 0xff, data);
+	}
+}
+
 void ym_write_a(uint8_t reg, uint8_t data) {
 	ym_busy_wait();
 	ym2610_ctrl[0] = reg;

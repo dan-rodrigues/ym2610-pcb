@@ -16,6 +16,9 @@ struct vgm_player_context {
 
 	bool write_active;
 	uint32_t last_write_index;
+
+	bool filter_fm_key_on;
+	bool filter_fm_pitch;
 };
 
 struct vgm_update_result {
