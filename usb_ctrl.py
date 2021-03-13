@@ -79,9 +79,8 @@ def get_status_ep(dev):
 
 
 def read_vgm(path):
-	vgm_file = open(path, "rb")
-	vgm = vgm_file.read()
-	vgm_file.close()
+	with open(path, "rb") as vgm_file:
+		vgm = vgm_file.read()
 
 	if len(vgm) == 0:
 		print("VGM file is empty: ", path)
@@ -279,6 +278,10 @@ data_ep = get_data_ep(dev)
 status_ep = get_status_ep(dev)
 
 # Read a VGM to send
+
+if len(sys.argv) != 2:
+	print('Expected one argument with filename')
+	sys.exit(1)
 
 filename = sys.argv[1]
 
