@@ -92,6 +92,7 @@ void main() {
 
 	struct vgm_player_context player_ctx = {
 		.initialized = false,
+
 		// Config, can set at run time later
 		.filter_fm_key_on = true,
 		.filter_fm_pitch = true
@@ -152,12 +153,13 @@ void main() {
 			playback_active = true;
 		}
 
-		// MIDI:
+		// MIDI (using FM for now):
 
 		struct midi_msg midi_msg = { 0 };
 		while (midi_pending_msg(&midi_msg)) {
 			printf("main loop: received MIDI message of type %x\n", midi_msg.cmd);
 
+			// Needs configuring according to what channels need to be keyed
 			const uint8_t ch = 5;
 			const uint8_t ch_mask = 1 << ch | 1 << 4 | 1 << 6;
 
