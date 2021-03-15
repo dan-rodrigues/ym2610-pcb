@@ -4,11 +4,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-#include <stdint.h>
-
 #ifndef mem_util_h
 #define mem_util_h
 
+#include <stdint.h>
+#include <stddef.h>
+
 uint32_t read32(const uint8_t *bytes);
+void *memcpy(void *s1, const void *s2, size_t n);
 
 #endif

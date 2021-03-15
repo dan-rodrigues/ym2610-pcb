@@ -50,10 +50,10 @@ void fm_key_mask(struct fm_ctx *ctx, uint8_t ch_mask, bool on, uint8_t midi_note
 }
 
 void fm_key(struct fm_ctx *ctx, uint8_t ch, bool on, uint8_t midi_note) {
-	if (FM_DISABLE_EXTRA_CH && (ch >= 4)) {
-		// These channels only exist on the YM2610B
-		return;
-	}
+	// if (FM_DISABLE_EXTRA_CH && (ch >= 4)) {
+	// 	// These channels only exist on the YM2610B
+	// 	return;
+	// }
 
 	// Only key-off if note matches the original
 	// Unintentional muting otherwise

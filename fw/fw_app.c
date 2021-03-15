@@ -114,8 +114,7 @@ void main() {
 		if (length > 0) {
 			switch (mode) {
 				case YMU_WM_VGM:
-					vgm_write((uint8_t *)usb_data, offset, length);
-					player_ctx.last_write_index = offset + length;
+					vgm_write(usb_data, offset, length);
 					break;
 				case YMU_WM_PCM_A:
 					playback_active = false;

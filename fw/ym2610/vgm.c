@@ -18,6 +18,7 @@
 #include "pcm_mux.h"
 #include "ym_dbg_dac.h"
 #include "vgm_timer.h"
+#include "mem_util.h"
 
 // Config:
 
@@ -44,8 +45,7 @@ static uint8_t vgm[0x18000];
 
 static bool bounds_error_logged = false;
 
-__attribute__((noinline))
-void vgm_write(uint8_t *data, size_t offset, size_t length) {
+void vgm_write(const void *data, size_t offset, size_t length) {
 	if (length == 0) {
 		printf("vgm_write: expected non-zero length\n");
 		return;
@@ -59,10 +59,7 @@ void vgm_write(uint8_t *data, size_t offset, size_t length) {
 		return;
 	}
 
-	// FIXME: optimise
-	for (size_t i = 0; i < length; i++) {
-		vgm[offset + i] = data[i];
-	}
+	memcpy(&vgm[offset], data, length);
 
 	if (log_writes) {
 		printf("vgm_write: wrote vgm block (%x bytes @ %x)\n",
@@ -183,9 +180,11 @@ static void vgm_player_init(struct vgm_player_context *ctx) {
 	relative_offset |= vgm[relative_offset_index + 3] << 24;
 
 	ctx->index = relative_offset ? relative_offset_index + relative_offset : 0x40;
-	ctx->buffer_index = ctx->index;
 
-	// VGM loop offset (optional
+	ctx->buffer_index = ctx->index;
+	ctx->previous_buffer_index = ctx->buffer_index;
+
+	// VGM loop offset (optional)
 
 	const size_t loop_offset_index = 0x1c;
 
@@ -214,8 +213,16 @@ static void vgm_player_init(struct vgm_player_context *ctx) {
 	// Update attributes, not used unless buffering is needed
 
 	ctx->initialized = true;
-	ctx->write_active = false;
-	ctx->last_write_index = 0;
+}
+
+static void vgm_player_request_buffering(struct vgm_player_context *ctx, struct vgm_update_result *result, uint32_t offset, uint32_t size) {
+	uint32_t bytes_read = ctx->buffer_index - ctx->previous_buffer_index;
+	ctx->index += bytes_read;
+
+	result->buffering_needed = true;
+	result->buffer_target_offset = offset;
+	result->vgm_start_offset = ctx->index + size;
+	result->vgm_chunk_length = size;
 }
 
 static uint8_t vgm_player_read_byte(struct vgm_player_context *ctx, struct vgm_update_result *result) {
@@ -227,36 +234,21 @@ static uint8_t vgm_player_read_byte(struct vgm_player_context *ctx, struct vgm_u
 	const uint32_t buffer_size = 0x2000;
 
 	uint8_t byte = vgm[ctx->buffer_index++];
-	ctx->index++;
 
-	// Nothing to do if we aren't in the double buffer region (yet)
-	if (ctx->index < buffer_a_offset) {
-		return byte;	
-	}
-	// ..did we just enter buffer A?
-	if (ctx->buffer_index == buffer_a_offset) {
-		// Start writing to B
-		result->buffering_needed = true;
-		result->buffer_target_offset = buffer_b_offset;
-		result->vgm_start_offset = ctx->index + buffer_size;
-		result->vgm_chunk_length = buffer_size;
 	// ..did we just finish reading buffer A?
-	} else if (ctx->buffer_index == buffer_b_offset) {
+	if (ctx->buffer_index == buffer_b_offset) {
 		// Start writing to A
-		result->buffering_needed = true;
-		result->buffer_target_offset = buffer_a_offset;
-		result->vgm_start_offset = ctx->index + buffer_size;
-		result->vgm_chunk_length = buffer_size;
+		vgm_player_request_buffering(ctx, result, buffer_a_offset, buffer_size);
+
+		ctx->previous_buffer_index = buffer_b_offset;
 	// ..did we read the final byte of buffer B?
 	} else if (ctx->buffer_index == (buffer_b_offset + buffer_size)) {
-		// Jump back to start of A
-		ctx->buffer_index = buffer_a_offset;
+		// Start writing to B..
+		vgm_player_request_buffering(ctx, result, buffer_b_offset, buffer_size);
 
-		// Start writing to B
-		result->buffering_needed = true;
-		result->buffer_target_offset = buffer_b_offset;
-		result->vgm_start_offset = ctx->index + buffer_size;
-		result->vgm_chunk_length = buffer_size;
+		// ..then jump back to start of A
+		ctx->buffer_index = buffer_a_offset;
+		ctx->previous_buffer_index = buffer_a_offset;
 	}
 
 	return byte;
@@ -266,7 +258,7 @@ static void vgm_reset_initial_buffer(struct vgm_update_result *result) {
 	result->buffering_needed = true;
 	result->buffer_target_offset = 0x14000;
 	result->vgm_start_offset = 0x14000;
-	result->vgm_chunk_length = 0x2000;
+	result->vgm_chunk_length = 0x4000;
 }
 
 static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_update_result *result) {
@@ -319,7 +311,9 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_upd
 
 				if (ctx->loop_offset) {
 					ctx->index = ctx->loop_offset;
+
 					ctx->buffer_index = ctx->index;
+					ctx->previous_buffer_index = ctx->buffer_index;
 					printf("Looping..\n\n");
 				} else {
 					// If there's no loop, just restart the player

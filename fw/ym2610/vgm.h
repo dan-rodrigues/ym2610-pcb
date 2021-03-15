@@ -9,13 +9,14 @@
 
 struct vgm_player_context {
 	bool initialized;
+
 	uint32_t index;
+
 	uint32_t buffer_index;
+	uint32_t previous_buffer_index;
+
 	uint32_t loop_offset;
 	uint32_t loop_count;
-
-	bool write_active;
-	uint32_t last_write_index;
 
 	bool filter_fm_key_on;
 	// TODO: use this more granular mask
@@ -33,7 +34,7 @@ struct vgm_update_result {
 	uint32_t vgm_chunk_length;
 };
 
-void vgm_write(uint8_t *data, size_t offset, size_t length);
+void vgm_write(const void *data, size_t offset, size_t length);
 void vgm_pcm_write(uint32_t *data, size_t offset, size_t length);
 
 void vgm_init_playback(struct vgm_player_context *context);
