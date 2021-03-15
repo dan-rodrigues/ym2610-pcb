@@ -32,8 +32,12 @@ module top(
 	input  wire uart_rx,
 	output wire uart_tx,
 
-	// Button
+	// Button (on bitsy)
 	input  wire btn,
+
+	// Extra buttons (on PCB)
+	input wire btn_a,
+	input wire btn_b,
 
 	// LED
 	output wire [2:0] rgb,
@@ -65,7 +69,7 @@ module top(
 	output spdif_out
 );
 	localparam integer SPRAM_AW = 15; /* 14 => 64k, 15 => 128k */
-	localparam integer WB_N  =  13;
+	localparam integer WB_N  =  14;
 
 	localparam integer WB_DW = 32;
 	localparam integer WB_AW = 16;
@@ -148,7 +152,11 @@ module top(
 		.DW(WB_DW)
 	) uart_I (
 		.uart_tx  (uart_tx),
-		.uart_rx  (uart_rx),
+
+		// Disabling UART RX until it's actually needed
+		// .uart_rx  (uart_rx),
+		.uart_rx  (),
+
 		.wb_addr  (wb_addr[1:0]),
 		.wb_rdata (wb_rdata[1]),
 		.wb_we    (wb_we),
@@ -393,6 +401,38 @@ module top(
 		.wb_ack(wb_ack[12])
 	);
 
+	// Buttons [13]
+	//-----------
+
+	buttons buttons(
+		.clk(clk_24m),
+		.reset(rst),
+
+		.wb_we(wb_we),
+		.wb_cyc(wb_cyc[13]),
+		.wb_rdata(wb_rdata[13]),
+		.wb_ack(wb_ack[13]),
+
+		.btn({btn_b_r, btn_a_r})
+	);
+
+	wire btn_a_r;
+	wire btn_b_r;
+
+	SB_IO #(
+		.PIN_TYPE(6'b000001),
+		.PULLUP(1'b1),
+		.NEG_TRIGGER(1'b0),
+		.IO_STANDARD("SB_LVCMOS")
+	) btn_sbio [1:0] (
+		.INPUT_CLK(clk_24m),
+		.OUTPUT_CLK(clk_24m),
+		.CLOCK_ENABLE(1'b1),
+
+		.PACKAGE_PIN({btn_b, btn_a}),
+		.D_IN_0({btn_b_r, btn_a_r})
+	);
+
 	// YM3016 DAC
 	//-----------
 
@@ -457,27 +497,26 @@ module top(
 		.output_valid(dac_pcm_valid)
 	);
 
-    // YM2610 PMOD inputs (DAC):
+	// YM2610 PMOD inputs (DAC):
 
-    wire dac_sh1_r;
-    wire dac_sh2_r;
-    wire dac_clk_r;
-    wire dac_so_r;
+	wire dac_sh1_r;
+	wire dac_sh2_r;
+	wire dac_clk_r;
+	wire dac_so_r;
 
-    SB_IO #(
-        .PIN_TYPE(6'b100000),
-        .PULLUP(1'b0),
-        .NEG_TRIGGER(1'b0),
-        .IO_STANDARD("SB_LVCMOS")
-    ) ym_pmod_out_sbio [3:0] (
-        .INPUT_CLK(clk_24m),
-        .OUTPUT_CLK(clk_24m),
-        .CLOCK_ENABLE(1'b1),
+	SB_IO #(
+		.PIN_TYPE(6'b000000),
+		.PULLUP(1'b0),
+		.NEG_TRIGGER(1'b0),
+		.IO_STANDARD("SB_LVCMOS")
+	) ym_pmod_out_sbio [3:0] (
+		.INPUT_CLK(clk_24m),
+		.OUTPUT_CLK(clk_24m),
+		.CLOCK_ENABLE(1'b1),
 
-        .PACKAGE_PIN({dac_sh1, dac_sh2, dac_clk, dac_so}),
-        .D_IN_0({dac_sh1_r, dac_sh2_r, dac_clk_r, dac_so_r}),
-        .OUTPUT_ENABLE(1'b0)
-    );
+		.PACKAGE_PIN({dac_sh1, dac_sh2, dac_clk, dac_so}),
+		.D_IN_0({dac_sh1_r, dac_sh2_r, dac_clk_r, dac_so_r})
+	);
 
 	// SPDIF:
 

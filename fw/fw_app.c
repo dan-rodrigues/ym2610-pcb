@@ -40,6 +40,7 @@
 #include "ym_usb.h"
 #include "spi_mem.h"
 #include "midi.h"
+#include "buttons.h"
 
 #include "ym2610/vgm.h"
 #include "ym2610/ym_ctrl.h"
@@ -92,10 +93,8 @@ void main() {
 
 	struct vgm_player_context player_ctx = {
 		.initialized = false,
-
-		// Config, can set at run time later
-		.filter_fm_key_on = true,
-		.filter_fm_pitch = true
+		// TODO: replace global mask with this
+		// .fm_key_on_mask = ~0x4 & 0xf
 	};
 
 	struct fm_ctx fm_ctx;
@@ -159,13 +158,39 @@ void main() {
 		while (midi_pending_msg(&midi_msg)) {
 			printf("main loop: received MIDI message of type %x\n", midi_msg.cmd);
 
-			// Needs configuring according to what channels need to be keyed
-			const uint8_t ch = 5;
-			const uint8_t ch_mask = 1 << ch | 1 << 4 | 1 << 6;
+			// Temporary test with masking for MIDI keyed notes
+			const uint8_t ch_mask = 0x4;
 
 			bool key_on = midi_msg.cmd == MIDI_CMD_NOTE_ON;
 
 			fm_key_mask(&fm_ctx, ch_mask, key_on, midi_msg.note_ctx.note);
+		}
+
+		// Buttons (TODO)
+
+		btn_poll();
+
+		if (btn_a_edge()) {
+			static uint8_t filter_index;
+			filter_index = filter_index < 2 ? filter_index + 1 : 0;
+
+			bool filter_fm = filter_index & 0x01;
+			player_ctx.filter_fm_key_on = filter_fm;
+			player_ctx.filter_fm_pitch = filter_fm;
+
+			bool filter_pcm = filter_index & 0x02;
+			player_ctx.filter_pcm_key_on = filter_pcm;
+
+			// Force-disable channels if any happen to be playing
+
+			if (filter_pcm) {
+				ym_write(0x010, 0x01);
+				ym_write(0x100, 0x80 | 0x3f);
+			}
+
+			if (filter_fm) {
+				fm_mute_all(&fm_ctx);
+			}
 		}
 	}
 }

@@ -18,7 +18,11 @@ struct vgm_player_context {
 	uint32_t last_write_index;
 
 	bool filter_fm_key_on;
+	// TODO: use this more granular mask
+	uint8_t fm_key_on_mask;
+
 	bool filter_fm_pitch;
+	bool filter_pcm_key_on;
 };
 
 struct vgm_update_result {

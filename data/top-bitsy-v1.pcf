@@ -51,9 +51,13 @@ set_io -nowarn uart_tx 44
 # Clock
 set_io -nowarn clk_in 35
 
-# Button
+# Button (bitsy)
 set_io -nowarn btn 2
 
+# Button (PCB)
+set_io -pullup yes -pullup_resistor 3P3K btn_a 28
+set_io -pullup yes -pullup_resistor 3P3K btn_b 31
+ 
 # Leds
 set_io -nowarn rgb[0] 39
 set_io -nowarn rgb[1] 40

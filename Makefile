@@ -14,6 +14,7 @@ PROJ_RTL_SRCS := $(addprefix rtl/, \
 	sysmgr.v \
 	spi_mem.v \
 	vgm_timer.v \
+	buttons.v \
 	ym2610/ym2610_ctrl.v \
 	ym2610/ym2610_pcm_mux_ctrl.v \
 	ym2610/ym3016.v \

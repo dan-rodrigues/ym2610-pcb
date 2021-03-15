@@ -45,6 +45,7 @@ HEADERS_app=\
 	spi_mem.h \
 	mem_util.h \
 	midi.h \
+	buttons.h \
 	ym2610/vgm.h \
 	ym2610/vgm_timer.h \
 	ym2610/ym_ctrl.h \
@@ -58,6 +59,7 @@ SOURCES_app=\
 	spi_mem.c \
 	mem_util.c \
 	midi.c \
+	buttons.c \
 	fw_app.c \
 	usb_desc_app.c \
 	ym2610/vgm.c \

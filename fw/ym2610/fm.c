@@ -29,6 +29,18 @@ void fm_init(struct fm_ctx *ctx) {
 	}
 }
 
+void fm_mute_all(struct fm_ctx *ctx) {
+	fm_mute(ctx, (1 << FM_CH_COUNT) - 1);
+}
+
+void fm_mute(struct fm_ctx *ctx, uint8_t ch_mask) {
+	for (uint32_t i = 0; i < FM_CH_COUNT; i++) {
+		if ((ch_mask >> i) & 0x01) {
+			fm_key(ctx, i, false, ctx->channel_notes[i]);
+		}
+	}
+}
+
 void fm_key_mask(struct fm_ctx *ctx, uint8_t ch_mask, bool on, uint8_t midi_note) {
 	for (uint32_t i = 0; i < FM_CH_COUNT; i++) {
 		if ((ch_mask >> i) & 0x01) {
@@ -38,6 +50,11 @@ void fm_key_mask(struct fm_ctx *ctx, uint8_t ch_mask, bool on, uint8_t midi_note
 }
 
 void fm_key(struct fm_ctx *ctx, uint8_t ch, bool on, uint8_t midi_note) {
+	if (FM_DISABLE_EXTRA_CH && (ch >= 4)) {
+		// These channels only exist on the YM2610B
+		return;
+	}
+
 	// Only key-off if note matches the original
 	// Unintentional muting otherwise
 	if (!on && (ctx->channel_notes[ch] != midi_note)) {
@@ -59,7 +76,13 @@ void fm_key(struct fm_ctx *ctx, uint8_t ch, bool on, uint8_t midi_note) {
 	const uint8_t op_mask = (on ? op : 0);
 	const uint8_t kon_reg = 0x28;
 
-	uint8_t data = op_mask << 4 | ch;
+	static const uint8_t key_ch_map[] = {
+		0, 1, 5, 6,
+		// Only on 2610B:
+		2, 4
+	};
+
+	uint8_t data = op_mask << 4 | key_ch_map[ch];
 
 	ym_write_a(kon_reg, data);
 }
@@ -85,5 +108,11 @@ static void fm_set_pitch(const struct fm_ctx *ctx, uint8_t ch, uint8_t midi_note
 }
 
 static uint16_t fm_reg_base(uint8_t ch) {
-	return (ch >= 4 ? 0x100 : 0x000) + (ch & 0x03);
+	static const uint16_t reg_table[] = {
+		0x001, 0x002, 0x101, 0x102,
+		// Only on 2610B:
+		0x000, 0x100
+	};
+
+	return reg_table[ch];
 }

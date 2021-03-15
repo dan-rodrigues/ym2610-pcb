@@ -359,6 +359,10 @@ static bool vgm_filter_reg_write(uint8_t port, uint8_t reg, uint8_t data, const 
 		return false;
 	}
 
+	if (ctx->filter_pcm_key_on && ((address == 0x010) || (address == 0x100))) {
+		return false;
+	}
+
 	if (address >= 0x010 && address <= 0x01c) {
 		if (log_writes) {
 			printf("ADPCM-B: (%03x) = %02x: %s\n",
