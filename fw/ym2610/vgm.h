@@ -18,8 +18,6 @@ struct vgm_player_context {
 	uint32_t loop_offset;
 	uint32_t loop_count;
 
-	bool filter_fm_key_on;
-	// TODO: use this more granular mask
 	uint8_t fm_key_on_mask;
 
 	bool filter_fm_pitch;

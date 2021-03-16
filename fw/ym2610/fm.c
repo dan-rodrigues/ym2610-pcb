@@ -8,6 +8,12 @@
 
 #include "ym_ctrl.h"
 
+static const uint8_t key_ch_map[] = {
+	0, 1, 5, 6,
+	// Only on 2610B:
+	2, 4
+};
+
 static uint16_t fm_reg_base(uint8_t ch);
 static void fm_set_pitch(const struct fm_ctx *ctx, uint8_t ch, uint8_t midi_note);
 
@@ -76,12 +82,6 @@ void fm_key(struct fm_ctx *ctx, uint8_t ch, bool on, uint8_t midi_note) {
 	const uint8_t op_mask = (on ? op : 0);
 	const uint8_t kon_reg = 0x28;
 
-	static const uint8_t key_ch_map[] = {
-		0, 1, 5, 6,
-		// Only on 2610B:
-		2, 4
-	};
-
 	uint8_t data = op_mask << 4 | key_ch_map[ch];
 
 	ym_write_a(kon_reg, data);
@@ -115,4 +115,59 @@ static uint16_t fm_reg_base(uint8_t ch) {
 	};
 
 	return reg_table[ch];
+}
+
+bool fm_should_allow_key_on(uint16_t address, uint8_t data, uint8_t ch_mask) {
+	if (ch_mask == 0xf) {
+		// All channels are included, no point checking anything else
+		return true;
+	}
+
+	if (address != 0x28) {
+		// Not an FM key-on
+		return true;
+	}
+
+	// if (!(data & 0xf0)) {
+	// 	// Not keying any operators
+	// 	return true;
+	// }
+
+	for (uint32_t i = 0; i < FM_CH_COUNT; i++) {
+		if (!(ch_mask >> i & 0x01)) {
+			continue;
+		}
+
+		uint8_t encoded_ch = data & 0x7;
+		if (key_ch_map[i] == encoded_ch) {
+			// ch_mask includes this channel, allow it
+			return true;
+		}
+	}
+
+	// ch_mask did not include this channel, disallow it
+	return false;
+}
+
+bool fm_should_allow_pitch_write(uint16_t address, uint8_t data, uint8_t ch_mask) {
+	if ((address & 0x0f0) != 0x0a0) {
+		return true;
+	}
+
+	for (uint32_t i = 0; i < FM_CH_COUNT; i++) {
+		if (!(ch_mask >> i & 0x01)) {
+			continue;
+		}
+
+		uint16_t reg_base = fm_reg_base(i);
+
+		if (address == (reg_base + 0xa0)) {
+			return true;
+		}
+		if (address == (reg_base + 0xa4)) {
+			return true;
+		}
+	}
+
+	return false;
 }

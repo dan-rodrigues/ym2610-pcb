@@ -92,9 +92,7 @@ void main() {
 	// VGM player context / config
 
 	struct vgm_player_context player_ctx = {
-		.initialized = false,
-		// TODO: replace global mask with this
-		// .fm_key_on_mask = ~0x4 & 0xf
+		.initialized = false
 	};
 
 	struct fm_ctx fm_ctx;
@@ -165,16 +163,21 @@ void main() {
 			fm_key_mask(&fm_ctx, ch_mask, key_on, midi_msg.note_ctx.note);
 		}
 
-		// Buttons (TODO)
+		// Buttons (may change their functions)
 
 		btn_poll();
+
+		// Button A: cycle sound sources
 
 		if (btn_a_edge()) {
 			static uint8_t filter_index;
 			filter_index = filter_index < 2 ? filter_index + 1 : 0;
 
+			// Test mask to disable ch0 + ch1, 0xf normally to enable all
+			const uint8_t fm_ch_mask = 0xb;
+
 			bool filter_fm = filter_index & 0x01;
-			player_ctx.filter_fm_key_on = filter_fm;
+			player_ctx.fm_key_on_mask = filter_fm ? 0x0 : fm_ch_mask;
 			player_ctx.filter_fm_pitch = filter_fm;
 
 			bool filter_pcm = filter_index & 0x02;
@@ -188,6 +191,25 @@ void main() {
 			}
 
 			if (filter_fm) {
+				fm_mute_all(&fm_ctx);
+			}
+		}
+
+		// Button B: mute / enable all sound sources
+
+		if (btn_b_edge()) {
+			static bool filter_all;
+			filter_all = !filter_all;
+
+			player_ctx.fm_key_on_mask = filter_all ? 0x0 : 0xf;
+			player_ctx.filter_fm_pitch = filter_all;
+
+			player_ctx.filter_pcm_key_on = filter_all;
+
+			if (filter_all) {
+				ym_write(0x010, 0x01);
+				ym_write(0x100, 0x80 | 0x3f);
+
 				fm_mute_all(&fm_ctx);
 			}
 		}

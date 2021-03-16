@@ -30,4 +30,7 @@ void fm_mute(struct fm_ctx *ctx, uint8_t ch_mask);
 void fm_key_mask(struct fm_ctx *ctx, uint8_t ch_mask, bool on, uint8_t midi_note);
 void fm_key(struct fm_ctx *ctx, uint8_t ch, bool on, uint8_t note);
 
+bool fm_should_allow_key_on(uint16_t address, uint8_t data, uint8_t ch_mask);
+bool fm_should_allow_pitch_write(uint16_t address, uint8_t data, uint8_t ch_mask);
+
 #endif

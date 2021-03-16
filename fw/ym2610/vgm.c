@@ -19,6 +19,7 @@
 #include "ym_dbg_dac.h"
 #include "vgm_timer.h"
 #include "mem_util.h"
+#include "fm.h"
 
 // Config:
 
@@ -210,9 +211,10 @@ static void vgm_player_init(struct vgm_player_context *ctx) {
 
 	printf("YM2610 clock: %dHz\n", ym_clock);
 
-	// Update attributes, not used unless buffering is needed
+	// Other attributes
 
 	ctx->initialized = true;
+	ctx->fm_key_on_mask = 0xf;
 }
 
 static void vgm_player_request_buffering(struct vgm_player_context *ctx, struct vgm_update_result *result, uint32_t offset, uint32_t size) {
@@ -345,15 +347,18 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_upd
 static bool vgm_filter_reg_write(uint8_t port, uint8_t reg, uint8_t data, const struct vgm_player_context *ctx) {
 	uint16_t address = port << 8 | reg;
 
-	if (ctx->filter_fm_key_on && (address == 0x028)) {
-		return false;
-	}
-
 	if (ctx->filter_fm_pitch && (reg >= 0xa0 && reg <= 0xa6)) {
 		return false;
 	}
 
 	if (ctx->filter_pcm_key_on && ((address == 0x010) || (address == 0x100))) {
+		return false;
+	}
+
+	if (!fm_should_allow_key_on(address, data, ctx->fm_key_on_mask)) {
+		return false;
+	}
+	if (!fm_should_allow_pitch_write(address, data, ctx->fm_key_on_mask)) {
 		return false;
 	}
 
