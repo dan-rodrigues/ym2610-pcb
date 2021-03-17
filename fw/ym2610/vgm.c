@@ -28,6 +28,7 @@ static const bool log_pcm_write_blocks = false;
 
 static const bool enable_adpcm_a = true;
 static const bool enable_adpcm_b = true;
+static const bool enable_fm = true;
 
 static const bool enable_dac_logging = false;
 
@@ -360,6 +361,10 @@ static bool vgm_filter_reg_write(uint8_t port, uint8_t reg, uint8_t data, const 
 	}
 	if (!fm_should_allow_pitch_write(address, data, ctx->fm_key_on_mask)) {
 		return false;
+	}
+
+	if ((address >= 0x020 && address <= 0x0b7) || address >= 0x130) {
+		return enable_fm;
 	}
 
 	if (address >= 0x010 && address <= 0x01c) {
