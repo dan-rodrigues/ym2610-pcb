@@ -174,7 +174,7 @@ void main() {
 			filter_index = filter_index < 2 ? filter_index + 1 : 0;
 
 			// Test mask to disable ch0 + ch1, 0xf normally to enable all
-			const uint8_t fm_ch_mask = 0xb;
+			const uint8_t fm_ch_mask = 0xf;
 
 			bool filter_fm = filter_index & 0x01;
 			player_ctx.fm_key_on_mask = filter_fm ? 0x0 : fm_ch_mask;
