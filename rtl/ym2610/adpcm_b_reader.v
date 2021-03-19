@@ -340,12 +340,13 @@ module adpcm_b_reader #(
 		end
 	end
 
+	wire pw_ym_io_en_nx = 1;
+	wire pw_mux_oe_n_nx = 1;
+
 	always @* begin
 		pw_mux_sel_nx = 0;
-		pw_mux_oe_n_nx = 1;
 		pw_pcm_load_nx = 0;
 		write_complete = 0;
-		pw_ym_io_en_nx = 1;
 		pw_ym_io_out_nx = 0;
 
 		case (pcm_write_step)

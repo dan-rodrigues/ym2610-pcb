@@ -350,18 +350,17 @@ module adpcm_a_reader(
 	end	
 
 	reg [2:0] pw_mux_sel_nx;
-	reg pw_mux_oe_n_nx;
 	reg [3:0] pw_ym_io_out_nx;
 	reg pw_ym_io_en_nx;
 	reg pw_pcm_load_nx;
-
 	reg write_complete;
+
+	wire pw_mux_oe_n_nx = 1;
+	wire pw_ym_io_en_nx = 1;
 
 	always @* begin
 		pw_mux_sel_nx = 0;
-		pw_mux_oe_n_nx = 1;
 		pw_pcm_load_nx = 0;
-		pw_ym_io_en_nx = 1;
 		pw_ym_io_out_nx = 0;
 
 		write_complete = 0;
@@ -387,7 +386,6 @@ module adpcm_a_reader(
 				// High nybble: hold + LE low
 				pw_mux_sel_nx = 3'b010;
 				pw_ym_io_out_nx = pcm[7:4];
-				pw_pcm_load_nx = 0;
 			end
 			4: begin
 				// Extra state incase ADPCMB interrupts the write on final cycle
