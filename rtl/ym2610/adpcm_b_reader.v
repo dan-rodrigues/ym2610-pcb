@@ -115,12 +115,15 @@ module adpcm_b_reader #(
 	always @* begin
 		if (reset) begin
 			pcm_mux_needed = 0;
-		end else if (pmpx_rose || pcm_mem_ready) begin
+		end else if (pmpx_rose) begin
 			pcm_mux_needed = 1;
 		end else begin
 			case (state)
 				S_ADDRESS_READING, S_PCM_WRITING: begin
 					pcm_mux_needed = 1;
+				end
+				S_PCM_READING: begin
+					pcm_mux_needed = pcm_mem_ready;
 				end
 				default: begin
 					pcm_mux_needed = 0;
@@ -130,14 +133,10 @@ module adpcm_b_reader #(
 	end
 
 	always @(posedge clk) begin
-		if (reset) begin
-			read_state <= 0;
+		if (state == S_ADDRESS_READING) begin
+			read_state <= read_state + 1;
 		end else begin
-			if (state_changing_to(S_ADDRESS_READING)) begin
-				read_state <= 0;
-			end else if (state == S_ADDRESS_READING) begin
-				read_state <= read_state + 1;
-			end
+			read_state <= 0;
 		end
 	end
 
@@ -285,10 +284,10 @@ module adpcm_b_reader #(
 	reg [1:0] write_state;
 
 	always @(posedge clk) begin
-		if (state_changing_to(S_PCM_WRITING)) begin
-			write_state <= 0;
-		end else if (state == S_PCM_WRITING) begin
+		if (state == S_PCM_WRITING) begin
 			write_state <= write_state + 1;
+		end else begin
+			write_state <= 0;
 		end
 	end	
 
