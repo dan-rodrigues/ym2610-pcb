@@ -195,26 +195,22 @@ module adpcm_b_reader #(
 		MUX_SEL_PA11_8 = 3'b011;
 
 	reg [2:0] ar_mux_sel_nx;
-	reg ar_mux_oe_n_nx;
+	wire ar_mux_oe_n_nx = 0;
 
 	always @* begin
 		ar_mux_sel_nx = 0;
-		ar_mux_oe_n_nx = 1;
 
 		if (pmpx_rose) begin
 			// Address low (first cycle before entering state)
 			ar_mux_sel_nx = MUX_SEL_PAD3_0;
-			ar_mux_oe_n_nx = 0;
 		end else begin
 			case (read_state)
 				// Address low
 				0: begin
 					ar_mux_sel_nx = MUX_SEL_PAD7_4;
-					ar_mux_oe_n_nx = 0;
 				end
 				1: begin
 					ar_mux_sel_nx = MUX_SEL_PA11_8;
-					ar_mux_oe_n_nx = 0;
 				end
 				// Address high
 				2, 3, 4, 5: begin
@@ -224,15 +220,12 @@ module adpcm_b_reader #(
 					// +1 cycle to give a bit more time for address to settle
 					// Waiting too long means read starts too late though, need to balance this
 					ar_mux_sel_nx = MUX_SEL_PAD3_0;
-					ar_mux_oe_n_nx = 0;
 				end
 				6: begin
 					ar_mux_sel_nx = MUX_SEL_PAD7_4;
-					ar_mux_oe_n_nx = 0;
 				end
 				7: begin
 					ar_mux_sel_nx = MUX_SEL_PA11_8;
-					ar_mux_oe_n_nx = 0;
 				end
 			endcase
 		end
@@ -295,7 +288,6 @@ module adpcm_b_reader #(
 		if (state_changing_to(S_PCM_WRITING)) begin
 			write_state <= 0;
 		end else if (state == S_PCM_WRITING) begin
-			// condition is redundant?
 			write_state <= write_state + 1;
 		end
 	end	

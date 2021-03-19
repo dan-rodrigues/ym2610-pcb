@@ -298,7 +298,7 @@ module ym2610_pcm_mux_ctrl #(
 	wire rmpx_in;
 
 	SB_IO #(
-		.PIN_TYPE(6'b100000),
+		.PIN_TYPE(6'b000000),
 		.PULLUP(1'b0),
 		.NEG_TRIGGER(1'b0),
 		.IO_STANDARD("SB_LVCMOS")
@@ -308,8 +308,6 @@ module ym2610_pcm_mux_ctrl #(
 		.CLOCK_ENABLE(1'b1),
 
 		.PACKAGE_PIN({pmpx, rmpx}),
-		.OUTPUT_ENABLE(1'b0),
-
 		.D_IN_0({pmpx_in, rmpx_in})
 	);
 
