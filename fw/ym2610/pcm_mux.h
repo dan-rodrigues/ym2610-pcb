@@ -22,4 +22,3 @@ void pcm_mux_get_mpx_metrics(struct pcm_mux_mpx_metrics *metrics);
 void pcm_mux_reset_mpx_metrics(void);
 
 #endif
-

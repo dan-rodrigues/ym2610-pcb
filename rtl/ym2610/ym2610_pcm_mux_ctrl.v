@@ -13,7 +13,7 @@ module ym2610_pcm_mux_ctrl #(
 
 	// Wishbone
 
-	input [1:0] wb_addr,
+	input [2:0] wb_addr,
 	input [31:0] wb_wdata,
 	output reg [31:0] wb_rdata,
 	input wb_cyc,
@@ -75,11 +75,17 @@ module ym2610_pcm_mux_ctrl #(
 			wb_rdata <= 0;
 
 			if (wb_cyc && !wb_we) begin
-				if (!wb_addr[1]) begin
-					wb_rdata <= wb_addr[0] ? rmpx_fall_count : rmpx_rise_count;
-				end else begin
-					wb_rdata <= wb_addr[0] ? pmpx_fall_count : pmpx_rise_count;
-				end
+				case (wb_addr[2:1])
+					0: begin
+						wb_rdata <= wb_addr[0] ? rmpx_fall_count : rmpx_rise_count;
+					end
+					1: begin
+						wb_rdata <= wb_addr[0] ? pmpx_fall_count : pmpx_rise_count;
+					end
+					2: begin
+						wb_rdata <= {p_dbg_previous_data, p_dbg_previous_addr};
+					end
+				endcase
 			end
 		end
 	end
@@ -215,6 +221,9 @@ module ym2610_pcm_mux_ctrl #(
 	wire [15:0] pmpx_rise_count;
 	wire [15:0] pmpx_fall_count;
 
+	wire [23:0] p_dbg_previous_addr;
+	wire [7:0] p_dbg_previous_data;
+
 	adpcm_b_reader #(
 		// 4M offset assumes A/B have their separate 4MB regions
 		// This only works in cases where the audio ROMs are <= 4MB total
@@ -245,7 +254,10 @@ module ym2610_pcm_mux_ctrl #(
 		.pcm_mem_rdata(pcm_mem_rdata),
 		.pcm_mem_ready(pcm_mem_ready),
 		.pcm_mem_addr(p_pcm_mem_addr),
-		.pcm_mem_valid(p_pcm_mem_valid)
+		.pcm_mem_valid(p_pcm_mem_valid),
+
+		.dbg_previous_addr(p_dbg_previous_addr),
+		.dbg_previous_data(p_dbg_previous_data)
 	);
 
 	// --- IO regs ---

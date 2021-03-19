@@ -345,7 +345,7 @@ module top(
 
 		// Wishbone
 
-		.wb_addr(wb_addr[1:0]),
+		.wb_addr(wb_addr[2:0]),
 		.wb_wdata(wb_wdata),
 		.wb_rdata(wb_rdata[10]),
 		.wb_cyc(wb_cyc[10]),

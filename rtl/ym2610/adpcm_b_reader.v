@@ -15,7 +15,7 @@ module adpcm_b_reader #(
 	output reg [15:0] pmpx_rise_count,
 	output reg [15:0] pmpx_fall_count,
 	input pmpx_count_reset,
-
+	
 	// PCM Mux
 
 	output reg pcm_mux_needed,
@@ -38,7 +38,12 @@ module adpcm_b_reader #(
 	input pcm_mem_ready,
 
 	output [23:0] pcm_mem_addr,
-	output reg pcm_mem_valid
+	output reg pcm_mem_valid,
+
+	// Debugging
+
+	output reg [23:0] dbg_previous_addr,
+	output reg [7:0] dbg_previous_data
 );
 	// --- IO ---
 
@@ -152,7 +157,7 @@ module adpcm_b_reader #(
 	always @* begin
 		if (pmpx_rose || (state == S_ADDRESS_READING)) begin
 			mux_src = MUX_SRC_ADDRESS;
-		end else if (pcm_mem_ready || (state == S_PCM_WRITING)) begin
+		end else if ((pcm_mem_ready && (state == S_PCM_READING)) || (state == S_PCM_WRITING)) begin
 			mux_src = MUX_SRC_PCM_WRITE;
 		end else begin
 			mux_src = MUX_SRC_PCM_READ;
@@ -212,18 +217,18 @@ module adpcm_b_reader #(
 					ar_mux_sel_nx = MUX_SEL_PA11_8;
 				end
 				// Address high
-				2, 3, 4, 5: begin
-					// 4 cycles while we wait for data to change to PMPX-fall output (hi address)
+				2, 3: begin
+					// 2 cycles while we wait for data to change to PMPX-fall output (hi address)
 					// We access it before the falling edge to buy time though
 					// This was previously 2 cycles delay only but that is right on the edge
 					// +1 cycle to give a bit more time for address to settle
 					// Waiting too long means read starts too late though, need to balance this
 					ar_mux_sel_nx = MUX_SEL_PAD3_0;
 				end
-				6: begin
+				4: begin
 					ar_mux_sel_nx = MUX_SEL_PAD7_4;
 				end
-				7: begin
+				5: begin
 					ar_mux_sel_nx = MUX_SEL_PA11_8;
 				end
 			endcase
@@ -251,17 +256,16 @@ module adpcm_b_reader #(
 			3: begin
 				pcm_mem_addr_base[11:8] <= ym_io_in;
 			end
-			4, 5, 6: begin
+			4: begin
 				// ...waiting for the second set of signals to appear
-				// This might need tweaking
 			end
-			7: begin
+			5: begin
 				pcm_mem_addr_base[15:12] <= ym_io_in;
 			end
-			8: begin
+			6: begin
 				pcm_mem_addr_base[19:16] <= ym_io_in;
 			end
-			9: begin
+			7: begin
 				pcm_mem_addr_base[23:20] <= ym_io_in;
 				address_read_complete <= 1;
 			end
@@ -290,14 +294,6 @@ module adpcm_b_reader #(
 			write_state <= 0;
 		end
 	end	
-
-	reg [2:0] pw_mux_sel_nx;
-	reg pw_mux_oe_n_nx;
-	reg [3:0] pw_ym_io_out_nx;
-	reg pw_ym_io_en_nx;
-	reg pw_pcm_load_nx;
-
-	reg write_complete;
 
 	reg [7:0] pcm;
 
@@ -339,6 +335,12 @@ module adpcm_b_reader #(
 		end
 	end
 
+	reg [2:0] pw_mux_sel_nx;
+	reg [3:0] pw_ym_io_out_nx;
+	reg pw_pcm_load_nx;
+
+	reg write_complete;
+
 	wire pw_ym_io_en_nx = 1;
 	wire pw_mux_oe_n_nx = 1;
 
@@ -352,14 +354,21 @@ module adpcm_b_reader #(
 			PCM_WRITE_LO_SETUP: begin
 				pw_mux_sel_nx = 3'b101;
 				pw_ym_io_out_nx = pcm_mem_rdata[3:0];
+
+				// This prematurely drives PAD7-4 with a duplicate nybble
+				// There's no ill effect from doing this though, it's set below
+				pw_pcm_load_nx = 1;
 			end
 			PCM_WRITE_LO_HOLD: begin
 				pw_mux_sel_nx = 3'b100;
 				pw_ym_io_out_nx = pcm[3:0];
+
+				pw_pcm_load_nx = 1;
 			end
 			PCM_WRITE_HI_SETUP: begin
 				pw_mux_sel_nx = 3'b100;
 				pw_ym_io_out_nx = pcm[7:4];
+
 				pw_pcm_load_nx = 1;
 			end
 			PCM_WRITE_HI_HOLD: begin
@@ -383,6 +392,15 @@ module adpcm_b_reader #(
 			end else if (pmpx_fell) begin
 				pmpx_fall_count <= pmpx_fall_count + 1;
 			end
+		end
+	end
+
+	// --- Debug ---
+
+	always @(posedge clk) begin
+		if (write_complete) begin
+			dbg_previous_addr <= pcm_mem_addr;
+			dbg_previous_data <= pcm;
 		end
 	end
 

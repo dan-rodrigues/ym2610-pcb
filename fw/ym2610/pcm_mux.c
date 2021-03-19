@@ -33,4 +33,3 @@ void pcm_mux_reset_mpx_metrics() {
 
 	*PCM_MUX_MPX_METRICS_RESET = rmpx_reset_mask | pmpx_reset_mask;
 }
-

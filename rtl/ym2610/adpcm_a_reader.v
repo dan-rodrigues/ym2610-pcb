@@ -351,7 +351,6 @@ module adpcm_a_reader(
 
 	reg [2:0] pw_mux_sel_nx;
 	reg [3:0] pw_ym_io_out_nx;
-	reg pw_ym_io_en_nx;
 	reg pw_pcm_load_nx;
 	reg write_complete;
 
