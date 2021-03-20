@@ -215,7 +215,7 @@ static void vgm_player_init(struct vgm_player_context *ctx) {
 	// Other attributes
 
 	ctx->initialized = true;
-	ctx->fm_key_on_mask = 0xf;
+	ctx->fm_key_on_mask = (1 << FM_CH_COUNT) - 1;
 }
 
 static void vgm_player_request_buffering(struct vgm_player_context *ctx, struct vgm_update_result *result, uint32_t offset, uint32_t size) {

@@ -46,8 +46,12 @@
 #include "ym2610/ym_ctrl.h"
 #include "ym2610/pcm_mux.h"
 #include "ym2610/fm.h"
+#include "ym2610/pcm.h"
 
 extern const struct usb_stack_descriptors app_stack_desc;
+
+static struct vgm_player_context player_ctx;
+static struct fm_ctx fm_ctx;
 
 static void boot_dfu(void);
 static void serial_no_init(void);
@@ -91,11 +95,7 @@ void main() {
 
 	// VGM player context / config
 
-	struct vgm_player_context player_ctx = {
-		.initialized = false
-	};
-
-	struct fm_ctx fm_ctx;
+	player_ctx.initialized = false;
 	fm_init(&fm_ctx);
 
 	while (true) {
@@ -129,7 +129,7 @@ void main() {
 		}
 
 		if (playback_active) {
-			struct vgm_update_result result;
+			struct vgm_update_result result = { 0 };
 			vgm_continue_playback(&player_ctx, &result);
 
 			if (result.buffering_needed) {
@@ -146,6 +146,10 @@ void main() {
 
 		if (ymu_playback_start_pending()) {
 			vgm_init_playback(&player_ctx);
+			
+			fm_mute_all(&fm_ctx);
+			pcm_mute_all();
+
 			playback_active = true;
 		}
 
@@ -174,7 +178,7 @@ void main() {
 			filter_index = filter_index < 2 ? filter_index + 1 : 0;
 
 			// Test mask to disable ch0 + ch1, 0xf normally to enable all
-			const uint8_t fm_ch_mask = 0xf;
+			const uint8_t fm_ch_mask = 0x3f;
 
 			bool filter_fm = filter_index & 0x01;
 			player_ctx.fm_key_on_mask = filter_fm ? 0x0 : fm_ch_mask;
@@ -186,8 +190,7 @@ void main() {
 			// Force-disable channels if any happen to be playing
 
 			if (filter_pcm) {
-				ym_write(0x010, 0x01);
-				ym_write(0x100, 0x80 | 0x3f);
+				pcm_mute_all();
 			}
 
 			if (filter_fm) {
@@ -201,15 +204,13 @@ void main() {
 			static bool filter_all;
 			filter_all = !filter_all;
 
-			player_ctx.fm_key_on_mask = filter_all ? 0x0 : 0xf;
+			player_ctx.fm_key_on_mask = filter_all ? 0x0 : 0x3f;
 			player_ctx.filter_fm_pitch = filter_all;
 
 			player_ctx.filter_pcm_key_on = filter_all;
 
 			if (filter_all) {
-				ym_write(0x010, 0x01);
-				ym_write(0x100, 0x80 | 0x3f);
-
+				pcm_mute_all();
 				fm_mute_all(&fm_ctx);
 			}
 		}

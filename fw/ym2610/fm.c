@@ -118,7 +118,7 @@ static uint16_t fm_reg_base(uint8_t ch) {
 }
 
 bool fm_should_allow_key_on(uint16_t address, uint8_t data, uint8_t ch_mask) {
-	if (ch_mask == 0xf) {
+	if (ch_mask == 0x3f) {
 		// All channels are included, no point checking anything else
 		return true;
 	}

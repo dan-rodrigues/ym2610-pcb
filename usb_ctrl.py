@@ -189,12 +189,53 @@ def preprocess_vgm(vgm):
 	processed_vgm = ProcessedVGM()
 	vgm_bytes = bytearray(vgm)
 
+	flag_writes_removed = 0
+
+	###
+
+	def remove_block(length):
+		nonlocal vgm_bytes, index, loop_index
+
+		end = index + length
+		del vgm_bytes[index : end]
+
+		# Loop index may need adjusting if removal of PCM block displaced it
+		if index < loop_index:
+			block_size = end - index
+			loop_index -= block_size
+
+		index -= 1
+
+	def check_reg_write():
+		nonlocal vgm_bytes, index, flag_writes_removed
+
+		REG_FLAGS = 0x1c
+
+		cmd = vgm_bytes[index + 0]
+		reg = vgm_bytes[index + 1]
+		address = cmd & 0x01
+
+		removed_bytes = 0
+
+		# Flag writes have no effect on playback and should be removed
+		if address == 0 and reg == REG_FLAGS:
+			removed_bytes = 3
+			remove_block(removed_bytes)
+			flag_writes_removed += 1
+
+		# YM2612 writes need to be remapped as YM2610 writes
+		if cmd in [0x52, 0x53]:
+			vgm_bytes[index] += 6
+
+		index += 2 - removed_bytes
+
+	###
+
 	while index < len(vgm_bytes):
 		cmd = vgm_bytes[index]
-		index += 1
 
-		if cmd == 0x58 or cmd == 0x59:
-			index += 2
+		if cmd in [0x58, 0x59, 0x52, 0x53]:
+			check_reg_write()
 		elif (cmd & 0xf0) == 0x70:
 			pass
 		elif cmd == 0x61:
@@ -203,9 +244,18 @@ def preprocess_vgm(vgm):
 			pass
 		elif cmd == 0x66:
 			break
+		elif cmd == 0x4f:
+			# PSG stereo writes which sometimes appear but aren't used
+			remove_block(2)
+		elif cmd == 0x50:
+			# PSG write, needs mapping
+			remove_block(2)
+		elif (cmd & 0xf0) == 0x80:
+			# YM2612 PCM writes not supported
+			remove_block(1)
 		elif cmd == 0x67:
-			block_type = vgm_bytes[index + 1]
-			block_size = int.from_bytes(vgm_bytes[index + 2 : index + 6], byteorder='little')
+			block_type = vgm_bytes[index + 2]
+			block_size = int.from_bytes(vgm_bytes[index + 3 : index + 7], byteorder='little')
 			block_size -= 8
 			if block_size <= 0:
 				print("Expected PCM block size to be > 0")
@@ -216,12 +266,12 @@ def preprocess_vgm(vgm):
 				print("Unexpected block type: {:X}".format(block_type))
 				sys.exit(1)
 
-			total_size = int.from_bytes(vgm_bytes[index + 6 : index + 10], byteorder='little')
+			total_size = int.from_bytes(vgm_bytes[index + 7 : index + 11], byteorder='little')
 			if total_size == 0:
 				print('Expected total_size to be > 0')
 				sys.exit(1)
 
-			offset = int.from_bytes(vgm_bytes[index + 10 : index + 14], byteorder='little')
+			offset = int.from_bytes(vgm_bytes[index + 11 : index + 15], byteorder='little')
 
 			is_adpcm_a = block_type == 0x82
 
@@ -232,22 +282,14 @@ def preprocess_vgm(vgm):
 			if block_size > 0:
 				pcm_block = PCMBlock()
 				pcm_block.offset = offset
-				pcm_block.data = vgm_bytes[index + 14 : index + 14 + block_size]
+				pcm_block.data = vgm_bytes[index + 15 : index + 15 + block_size]
 				pcm_block.type = PCMType.A if is_adpcm_a else PCMType.B
 				processed_vgm.pcm_blocks.append(pcm_block)
 
 			# Remove PCM block portion from VGM as it's preloaded in separate write step(s)
-			block_start = index - 1
-			block_end = index + 14 + block_size
-			block_size = block_end - block_start
+			remove_block(block_size + 15)
 
-			del vgm_bytes[block_start : block_end]
-
-			index -= 1
-
-			# Loop index may need adjusting if removal of PCM block displaced it
-			if index < loop_index:
-				loop_index -= block_size
+		index += 1
 
 
 	# Reassign possibly adjusted loop offset due to PCM block removal above
@@ -259,6 +301,9 @@ def preprocess_vgm(vgm):
 	# Make immutable bytes object since this will be handled by another thread
 	processed_vgm.data = bytes(vgm_bytes)
 	print(processed_vgm)
+
+	if flag_writes_removed > 0:
+		print("Removed redundant flag writes: {:X}".format(flag_writes_removed))
 
 	return processed_vgm
 
