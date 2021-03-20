@@ -128,6 +128,15 @@ void main() {
 			}
 		}
 
+		if (ymu_playback_start_pending()) {
+			vgm_init_playback(&player_ctx);
+			
+			fm_mute_all(&fm_ctx);
+			pcm_mute_all();
+
+			playback_active = true;
+		}
+		
 		if (playback_active) {
 			struct vgm_update_result result = { 0 };
 			vgm_continue_playback(&player_ctx, &result);
@@ -142,15 +151,6 @@ void main() {
 					result.vgm_chunk_length
 				);
 			}
-		}
-
-		if (ymu_playback_start_pending()) {
-			vgm_init_playback(&player_ctx);
-			
-			fm_mute_all(&fm_ctx);
-			pcm_mute_all();
-
-			playback_active = true;
 		}
 
 		// MIDI (using FM for now):
