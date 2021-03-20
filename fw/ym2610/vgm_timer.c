@@ -21,10 +21,6 @@ static volatile struct vgm_timer_regs_r * const regs_r = (void*)(VGM_TIMER_BASE)
 static volatile struct vgm_timer_regs_w * const regs_w = (void*)(VGM_TIMER_BASE);
 
 void vgm_timer_set(uint16_t count) {
-	if (count == 0) {
-		return;
-	}
-
 	regs_w->set_counter = (count - 1);
 }
 
