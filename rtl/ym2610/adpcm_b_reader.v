@@ -2,7 +2,7 @@
 //
 // Copyright (C) 2021 Dan Rodrigues <danrr.gh.oss@gmail.com>
 //
-// SPDX-License-Identifier: CERN-OHL-W-2.0
+// SPDX-License-Identifier: CERN-OHL-S-2.0
 
 module adpcm_b_reader #(
 	parameter [23:0] ADDRESS_OFFSET = 24'b0

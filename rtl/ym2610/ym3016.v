@@ -2,7 +2,7 @@
 //
 // Copyright (C) 2021 Dan Rodrigues <danrr.gh.oss@gmail.com>
 //
-// SPDX-License-Identifier: CERN-OHL-W-2.0
+// SPDX-License-Identifier: CERN-OHL-S-2.0
 
 // Despite the name and the same "floating point DAC" references as YM3012, it doesn't accept floats as input.
 // Inputs are (un)signed 16bit depending on the FORM input.

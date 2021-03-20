@@ -6,7 +6,7 @@
  * Copyright (C) 2019-2020  Sylvain Munaut <tnt@246tNt.com>
  * Copyright (C) 2021 Dan Rodrigues <danrr.gh.oss@gmail.com>
  *
- * SPDX-License-Identifier: CERN-OHL-P-2.0
+ * SPDX-License-Identifier: CERN-OHL-S-2.0
  */
 
 `default_nettype none

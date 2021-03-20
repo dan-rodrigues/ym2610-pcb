@@ -2,7 +2,7 @@
 //
 // Copyright (C) 2021 Dan Rodrigues <danrr.gh.oss@gmail.com>
 //
-// SPDX-License-Identifier: CERN-OHL-W-2.0
+// SPDX-License-Identifier: CERN-OHL-S-2.0
 
 module ym2610_pcm_mux_ctrl #(
 	parameter [0:0] ENABLE_ADPCM_A = 1,
