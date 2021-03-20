@@ -8,22 +8,30 @@
 
 #include "config.h"
 
-static volatile uint32_t * const VGM_TIMER_COUNT = (void*)(VGM_TIMER_BASE + 0);
-static volatile uint32_t * const VGM_TIMER_ADD = (void*)(VGM_TIMER_BASE + 4);
-static volatile const uint32_t * const VGM_TIMER_ELAPSED = (void*)(VGM_TIMER_BASE + 0);
+struct vgm_timer_regs_r {
+	volatile uint32_t expired;
+} __attribute__((packed));
+
+struct vgm_timer_regs_w {
+	volatile uint32_t set_counter;
+	volatile uint32_t add_counter;
+} __attribute__((packed));
+
+static volatile struct vgm_timer_regs_r * const regs_r = (void*)(VGM_TIMER_BASE);
+static volatile struct vgm_timer_regs_w * const regs_w = (void*)(VGM_TIMER_BASE);
 
 void vgm_timer_set(uint16_t count) {
 	if (count == 0) {
 		return;
 	}
 
-	*VGM_TIMER_COUNT = (count - 1);
+	regs_w->set_counter = (count - 1);
 }
 
 bool vgm_timer_elapsed() {
-	return *VGM_TIMER_ELAPSED & 0x01;
+	return regs_r->expired;
 }
 
 void vgm_timer_add(uint16_t delta) {
-	*VGM_TIMER_ADD = delta;
+	regs_w->add_counter = delta;
 }
