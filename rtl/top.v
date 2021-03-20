@@ -396,6 +396,7 @@ module top #(
 		.clk(clk_24m),
 		.reset(rst),
 
+		.wb_addr(wb_addr[0]),
 		.wb_wdata(wb_wdata),
 		.wb_we(wb_we),
 		.wb_cyc(wb_cyc[12]),

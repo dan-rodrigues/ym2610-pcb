@@ -9,6 +9,7 @@
 #include "config.h"
 
 static volatile uint32_t * const VGM_TIMER_COUNT = (void*)(VGM_TIMER_BASE + 0);
+static volatile uint32_t * const VGM_TIMER_ADD = (void*)(VGM_TIMER_BASE + 4);
 static volatile const uint32_t * const VGM_TIMER_ELAPSED = (void*)(VGM_TIMER_BASE + 0);
 
 void vgm_timer_set(uint16_t count) {
@@ -21,4 +22,8 @@ void vgm_timer_set(uint16_t count) {
 
 bool vgm_timer_elapsed() {
 	return *VGM_TIMER_ELAPSED & 0x01;
+}
+
+void vgm_timer_add(uint16_t delta) {
+	*VGM_TIMER_ADD = delta;
 }

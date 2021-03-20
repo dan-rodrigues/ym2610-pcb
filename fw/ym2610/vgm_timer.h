@@ -11,6 +11,7 @@
 #include <stdbool.h>
 
 void vgm_timer_set(uint16_t count);
+void vgm_timer_add(uint16_t delta);
 bool vgm_timer_elapsed(void);
 
 #endif

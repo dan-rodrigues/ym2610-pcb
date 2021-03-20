@@ -127,7 +127,7 @@ void vgm_continue_playback(struct vgm_player_context *ctx, struct vgm_update_res
 	}
 
 	uint32_t delay_ticks = vgm_player_update(ctx, result);
-	vgm_timer_set(delay_ticks);
+	vgm_timer_add(delay_ticks);
 
 	if (enable_dac_logging) {
 		dac_debug_log();
