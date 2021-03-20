@@ -15,7 +15,23 @@ static const bool log_full_fifo = false;
 
 // ---
 
-static volatile uint32_t * const ym2610_ctrl = (void*)(YM2610_BASE);
+struct ym_ctrl_regs_r {
+	volatile uint32_t busy;
+} __attribute__((packed));
+
+struct ym_ctrl_regs_w {
+	volatile uint32_t reg_a;
+	volatile uint32_t data_a;
+
+	volatile uint32_t reg_b;
+	volatile uint32_t data_b;
+
+	volatile uint32_t reset;
+} __attribute__((packed));
+
+static volatile struct ym_ctrl_regs_r * const ym_ctrl_regs_r = (void*)(YM2610_BASE);
+static volatile struct ym_ctrl_regs_w * const ym_ctrl_regs_w = (void*)(YM2610_BASE);
+
 static void ym_busy_wait(void);
 
 void ym_write(uint16_t reg, uint8_t data) {
@@ -28,23 +44,23 @@ void ym_write(uint16_t reg, uint8_t data) {
 
 void ym_write_a(uint8_t reg, uint8_t data) {
 	ym_busy_wait();
-	ym2610_ctrl[0] = reg;
-	ym2610_ctrl[1] = data;
+	ym_ctrl_regs_w->reg_a = reg;
+	ym_ctrl_regs_w->data_a = data;
 }
 
 void ym_write_b(uint8_t reg, uint8_t data) {
 	ym_busy_wait();
-	ym2610_ctrl[2] = reg;
-	ym2610_ctrl[3] = data;
+	ym_ctrl_regs_w->reg_b = reg;
+	ym_ctrl_regs_w->data_b = data;
 }
 
 void ym_reset(bool reset_active) {
 	ym_busy_wait();
-	ym2610_ctrl[4] = !reset_active;
+	ym_ctrl_regs_w->reset = !reset_active;
 }
 
 static void ym_busy_wait() {
-	while (log_full_fifo && (ym2610_ctrl[0] & 0x01)) {
+	while (log_full_fifo && (ym_ctrl_regs_r->busy & 0x01)) {
 		printf("YM2610 CMD FIFO unexpectedly full..\n");
 	}
 }

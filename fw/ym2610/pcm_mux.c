@@ -11,25 +11,39 @@
 #include "config.h"
 #include "pcm_mux.h"
 
-static volatile uint32_t * const PCM_MUX_ENABLE = (void*)(PCM_MUX_BASE + 0);
-static volatile uint32_t * const PCM_MUX_MPX_METRICS_RESET = (void*)(PCM_MUX_BASE + 4);
+struct pcm_mux_regs_r {
+	volatile uint32_t rmpx_rise_count;
+	volatile uint32_t rmpx_fall_count;
+	volatile uint32_t pmpx_rise_count;
+	volatile uint32_t pmpx_fall_count;
 
-static volatile uint32_t * const PCM_MUX_MPX_METRICS = (void*)(PCM_MUX_BASE + 0);
+	// Upper 8 bits: last data read
+	// Lower 24bits: last address read
+	volatile uint32_t p_last_access_packed;
+} __attribute__((packed));
+
+struct pcm_mux_regs_w {
+	volatile uint32_t enable;
+	volatile uint32_t metrics_reset;
+} __attribute__((packed));
+
+static volatile struct pcm_mux_regs_r * const pcm_mux_regs_r = (void*)(PCM_MUX_BASE);
+static volatile struct pcm_mux_regs_w * const pcm_mux_regs_w = (void*)(PCM_MUX_BASE);
 
 void pcm_mux_set_enabled(bool enabled) {
-	*PCM_MUX_ENABLE = enabled;
+	pcm_mux_regs_w->enable = enabled;
 }
 
 void pcm_mux_get_mpx_metrics(struct pcm_mux_mpx_metrics *metrics) {
-	metrics->rmpx_rise_count = PCM_MUX_MPX_METRICS[0];
-	metrics->rmpx_fall_count = PCM_MUX_MPX_METRICS[1];
-	metrics->pmpx_rise_count = PCM_MUX_MPX_METRICS[2];
-	metrics->pmpx_fall_count = PCM_MUX_MPX_METRICS[3];
+	metrics->rmpx_rise_count = pcm_mux_regs_r->rmpx_rise_count;
+	metrics->rmpx_fall_count = pcm_mux_regs_r->rmpx_fall_count;
+	metrics->rmpx_rise_count = pcm_mux_regs_r->pmpx_rise_count;
+	metrics->rmpx_fall_count = pcm_mux_regs_r->pmpx_fall_count;
 }
 
 void pcm_mux_reset_mpx_metrics() {
 	const uint32_t rmpx_reset_mask = (1 << 0);
 	const uint32_t pmpx_reset_mask = (1 << 1);
 
-	*PCM_MUX_MPX_METRICS_RESET = rmpx_reset_mask | pmpx_reset_mask;
+	pcm_mux_regs_w->metrics_reset = rmpx_reset_mask | pmpx_reset_mask;
 }
