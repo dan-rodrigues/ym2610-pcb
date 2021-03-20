@@ -6,7 +6,8 @@
 
 module ym2610_pcm_mux_ctrl #(
 	parameter [0:0] ENABLE_ADPCM_A = 1,
-	parameter [0:0] ENABLE_ADPCM_B = 1
+	parameter [0:0] ENABLE_ADPCM_B = 1,
+	parameter [0:0] ENABLE_DEBUG_REGS = 0
 ) (
 	input clk,
 	input reset,
@@ -74,7 +75,7 @@ module ym2610_pcm_mux_ctrl #(
 		end else begin
 			wb_rdata <= 0;
 
-			if (wb_cyc && !wb_we) begin
+			if (wb_cyc && !wb_we && ENABLE_DEBUG_REGS) begin
 				case (wb_addr[2:1])
 					0: begin
 						wb_rdata <= wb_addr[0] ? rmpx_fall_count : rmpx_rise_count;

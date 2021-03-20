@@ -13,7 +13,9 @@
 
 `include "boards.vh"
 
-module top(
+module top #(
+	parameter [0:0] ENABLE_DAC_DEBUG_REGS = 0
+) (
 	// SPI
 	inout  wire [3:0] spi_io,
 	output  wire       spi_clk,
@@ -378,7 +380,7 @@ module top(
 	assign wb_ack[11] = dbg_dac_ack;
 
 	always @(posedge clk_24m) begin
-		if (wb_cyc[11] && !wb_we) begin
+		if (wb_cyc[11] && !wb_we && ENABLE_DAC_DEBUG_REGS) begin
 			dbg_dac_rdata <= wb_addr[0] ? dbg_dac_shift_right : dbg_dac_shift_left;
 		end else begin
 			dbg_dac_rdata <= 32'b0;
