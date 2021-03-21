@@ -5146,4 +5146,10 @@ Wire Wire Line
 	3500 13800 3750 13800
 Wire Wire Line
 	3750 13800 3750 13900
+Text Notes 19030 15780 0    79   Italic 16
+YM2610 PCB
+Text Notes 22270 15910 0    50   Italic 10
+v1.0.1
+Text Notes 18690 15370 0    50   ~ 0
+By Dan Rodrigues\n\nhttps://github.com/dan-rodrigues
 $EndSCHEMATC
