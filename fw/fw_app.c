@@ -177,7 +177,6 @@ void main() {
 			static uint8_t filter_index;
 			filter_index = filter_index < 2 ? filter_index + 1 : 0;
 
-			// Test mask to disable ch0 + ch1, 0xf normally to enable all
 			const uint8_t fm_ch_mask = 0x3f;
 
 			bool filter_fm = filter_index & 0x01;

@@ -523,7 +523,7 @@ module top #(
 
 	// SPDIF:
 
-	wire [15:0] spdif_selected_sample = spdif_channel_select ? dac_pcm_r_valid : dac_pcm_l_valid;
+	wire [15:0] spdif_selected_sample = spdif_channel_select ? dac_pcm_l_valid : dac_pcm_r_valid;
 	wire [23:0] spdif_pcm_in = {spdif_selected_sample, 8'b0};
 	wire spdif_channel_select;
 
