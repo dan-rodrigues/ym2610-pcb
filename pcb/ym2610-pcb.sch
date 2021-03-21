@@ -5151,5 +5151,5 @@ YM2610 PCB
 Text Notes 22270 15910 0    50   Italic 10
 v1.0.1
 Text Notes 18690 15370 0    50   ~ 0
-By Dan Rodrigues\n\nhttps://github.com/dan-rodrigues
+By Dan Rodrigues\nhttps://github.com/dan-rodrigues\n\nLicensed under CERN-OHL-W-2.0
 $EndSCHEMATC
