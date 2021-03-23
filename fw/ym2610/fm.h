@@ -15,20 +15,13 @@
 #define FM_CH_COUNT 6
 #define FM_DISABLE_EXTRA_CH 1
 
-struct fm_ctx {
-	uint8_t note_table[128];
-	uint8_t octave_table[128];
+void fm_init(void);
 
-	uint8_t channel_notes[FM_CH_COUNT];
-};
+void fm_mute_all(void);
+void fm_mute(uint8_t ch_mask);
 
-void fm_init(struct fm_ctx *ctx);
-
-void fm_mute_all(struct fm_ctx *ctx);
-void fm_mute(struct fm_ctx *ctx, uint8_t ch_mask);
-
-void fm_key_mask(struct fm_ctx *ctx, uint8_t ch_mask, bool on, uint8_t midi_note);
-void fm_key(struct fm_ctx *ctx, uint8_t ch, bool on, uint8_t note);
+void fm_key_mask(uint8_t ch_mask, bool on, uint8_t midi_note);
+void fm_key(uint8_t ch, bool on, uint8_t note);
 
 bool fm_should_allow_key_on(uint16_t address, uint8_t data, uint8_t ch_mask);
 bool fm_should_allow_pitch_write(uint16_t address, uint8_t data, uint8_t ch_mask);

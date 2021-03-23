@@ -47,16 +47,17 @@
 #include "ym2610/pcm_mux.h"
 #include "ym2610/fm.h"
 #include "ym2610/pcm.h"
+#include "ym2610/ssg.h"
 
 extern const struct usb_stack_descriptors app_stack_desc;
-
 static struct vgm_player_context player_ctx;
-static struct fm_ctx fm_ctx;
+static bool playback_active;
 
 static void boot_dfu(void);
 static void serial_no_init(void);
+static void mute_all(void);
 
-static bool playback_active;
+static void midi_update(void);
 
 void main() {
 	console_init();
@@ -96,7 +97,7 @@ void main() {
 	// VGM player context / config
 
 	player_ctx.initialized = false;
-	fm_init(&fm_ctx);
+	fm_init();
 
 	while (true) {
 		usb_poll();
@@ -115,6 +116,7 @@ void main() {
 					vgm_write(usb_data, offset, length);
 					break;
 				case YMU_WM_PCM_A:
+					// TODO: mute channels if needed
 					playback_active = false;
 					vgm_pcm_write(usb_data, offset, length);
 					break;
@@ -129,10 +131,10 @@ void main() {
 		}
 
 		if (ymu_playback_start_pending()) {
+			mute_all();
+			fm_init();
+
 			vgm_init_playback(&player_ctx);
-			
-			fm_mute_all(&fm_ctx);
-			pcm_mute_all();
 
 			playback_active = true;
 		}
@@ -141,7 +143,12 @@ void main() {
 			struct vgm_update_result result = { 0 };
 			vgm_continue_playback(&player_ctx, &result);
 
-			if (result.buffering_needed) {
+			if (result.player_error) {
+				printf("main loop: playback stopped due to player error\n");
+				mute_all();
+
+				playback_active = false;
+			} else if (result.buffering_needed) {
 				printf("main loop: requesting buffering @ %x, vgm range %x, %x bytes\n",
 						result.buffer_target_offset, result.vgm_start_offset, result.vgm_chunk_length);
 
@@ -153,19 +160,9 @@ void main() {
 			}
 		}
 
-		// MIDI (using FM for now):
+		// MIDI (simple demo using FM for now):
 
-		struct midi_msg midi_msg = { 0 };
-		while (midi_pending_msg(&midi_msg)) {
-			printf("main loop: received MIDI message of type %x\n", midi_msg.cmd);
-
-			// Temporary test with masking for MIDI keyed notes
-			const uint8_t ch_mask = 0x4;
-
-			bool key_on = midi_msg.cmd == MIDI_CMD_NOTE_ON;
-
-			fm_key_mask(&fm_ctx, ch_mask, key_on, midi_msg.note_ctx.note);
-		}
+		midi_update();
 
 		// Buttons (may change their functions)
 
@@ -190,10 +187,12 @@ void main() {
 
 			if (filter_pcm) {
 				pcm_mute_all();
+			} else {
+				pcm_unmute_adpcm_a(player_ctx.adpcma_last_atl);
 			}
 
 			if (filter_fm) {
-				fm_mute_all(&fm_ctx);
+				fm_mute_all();
 			}
 		}
 
@@ -209,11 +208,34 @@ void main() {
 			player_ctx.filter_pcm_key_on = filter_all;
 
 			if (filter_all) {
-				pcm_mute_all();
-				fm_mute_all(&fm_ctx);
+				mute_all();
+			} else {
+				pcm_unmute_adpcm_a(player_ctx.adpcma_last_atl);
 			}
 		}
 	}
+}
+
+// Minimal MIDI demo function
+// If it's further developed it would go in its own file with configuration structs etc.
+
+static void midi_update() {
+	struct midi_msg midi_msg = { 0 };
+	while (midi_pending_msg(&midi_msg)) {
+		printf("main loop: received MIDI message of type %x\n", midi_msg.cmd);
+
+		// Temporary test with masking for MIDI keyed notes
+		const uint8_t ch_mask = 0x4;
+
+		bool key_on = (midi_msg.cmd == MIDI_CMD_NOTE_ON);
+		fm_key_mask(ch_mask, key_on, midi_msg.note_ctx.note);
+	}
+}
+
+static void mute_all() {
+	pcm_mute_all();
+	fm_mute_all();
+	ssg_mute_all();
 }
 
 // Copied from original firmware:

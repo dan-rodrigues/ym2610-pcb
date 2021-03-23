@@ -22,6 +22,8 @@ struct vgm_player_context {
 
 	bool filter_fm_pitch;
 	bool filter_pcm_key_on;
+
+	uint8_t adpcma_last_atl;
 };
 
 struct vgm_update_result {
@@ -30,6 +32,8 @@ struct vgm_update_result {
 
 	uint32_t vgm_start_offset;
 	uint32_t vgm_chunk_length;
+
+	bool player_error;
 };
 
 void vgm_write(const void *data, size_t offset, size_t length);

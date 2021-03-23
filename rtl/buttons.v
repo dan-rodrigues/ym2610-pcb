@@ -21,17 +21,22 @@ module buttons(
 
 	always @(posedge clk) begin
 		wb_ack <= wb_cyc && !wb_ack;
-		wb_rdata <= (wb_cyc && !wb_we) ? {30'b0, btn_r} : 32'b0;
+		wb_rdata <= (wb_cyc && !wb_we) ? {30'b0, btn_debounced} : 32'b0;
 	end
 
 	// --- Buttons ---
 
-	// Not bothering to do proper debouncing here since it's infrequently polled by CPU
+	wire [1:0] btn_debounced;
 
-	reg [1:0] btn_r;
+	debouncer #(
+		.BTN_COUNT(2)
+	) debouncer (
+		.clk(clk),
+		.reset(reset),
 
-	always @(posedge clk) begin
-		btn_r <= btn;
-	end
+		.btn(btn),
+
+		.level(btn_debounced)
+	);
 
 endmodule

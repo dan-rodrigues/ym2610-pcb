@@ -40,7 +40,9 @@ static void mux_debug_log(void);
 static void vgm_player_sanity_check(void);
 static void vgm_player_init(struct vgm_player_context *context);
 static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_update_result *result);
+
 static bool vgm_filter_reg_write(uint8_t port, uint8_t reg, uint8_t data, const struct vgm_player_context *ctx);
+static void vgm_record_reg_write(uint8_t port, uint8_t reg, uint8_t data, struct vgm_player_context *ctx);
 
 // VGM buffer
 static uint8_t vgm[0x18000];
@@ -116,6 +118,7 @@ void vgm_init_playback(struct vgm_player_context *ctx) {
 
 void vgm_continue_playback(struct vgm_player_context *ctx, struct vgm_update_result *result) {
 	result->buffering_needed = false;
+	result->player_error = false;
 
 	if (!vgm_timer_elapsed()) {
 		return;
@@ -281,6 +284,7 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_upd
 				uint8_t reg = vgm_player_read_byte(ctx, result);
 				uint8_t data = vgm_player_read_byte(ctx, result);
 
+				vgm_record_reg_write(0, reg, data, ctx);
 				if (vgm_filter_reg_write(0, reg, data, ctx)) {
 					ym_write_a(reg, data);
 				}
@@ -291,6 +295,7 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_upd
 				uint8_t reg = vgm_player_read_byte(ctx, result);
 				uint8_t data = vgm_player_read_byte(ctx, result);
 
+				vgm_record_reg_write(1, reg, data, ctx);
 				if (vgm_filter_reg_write(1, reg, data, ctx)) {
 					ym_write_b(reg, data);
 				}
@@ -333,15 +338,25 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_upd
 
 			case 0x67:
 				printf("Found PCM block during playback. These should've been removed. \n");
-				while(true) {}
+				result->player_error = true;
+				return 0;
 
 			// Other unsupported commands which we should never encounter:
 
 			default:
 				printf("Unsupported command: %x, buffer index: %x, vgm index: %x\n",
 					   cmd, (ctx->buffer_index - 1), (ctx->index - 1));
-				while(true) {}
+				result->player_error = true;
+				return 0;
 		}
+	}
+}
+
+static void vgm_record_reg_write(uint8_t port, uint8_t reg, uint8_t data, struct vgm_player_context *ctx) {
+	uint16_t address = port << 8 | reg;
+
+	if (address == 0x101) {
+		ctx->adpcma_last_atl = data;
 	}
 }
 
