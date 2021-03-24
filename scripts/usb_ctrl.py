@@ -8,6 +8,9 @@
 
 import sys
 
+from vgm_preprocess import VGMPreprocessor
+from vgm_preprocess import PCMType
+
 import usb.core
 import usb.util
 
@@ -20,24 +23,9 @@ from enum import Enum
 import threading
 import time
 
-class PCMType(Enum):
-	A = 0
-	B = 1
+LOCAL_VGM_PREPROCESS_TEST = False
 
-class PCMBlock:
-	def __init__(self):
-		self.offset = 0
-		self.data = []
-		self.type = PCMType.A
-
-class ProcessedVGM:
-	def __init__(self):
-		self.data = []
-		self.pcm_blocks = []
-
-	def __repr__(self):
-		return "ProcessedVGM:\nCommand data length: {:X}\nPCM blocks: {:X}\n" \
-			.format(len(self.data), len(self.pcm_blocks))
+###
 
 def get_data_ep(dev):
 	cfg = dev.get_active_configuration()
@@ -121,7 +109,7 @@ def send_vgm(dev, ep, vgm, offset=0, restart_playback=True):
 		dev.ctrl_transfer(REQUEST_TYPE, CTRL_START_PLAYBACK, 0, 0)
 
 def send_pcm(dev, ep, block):
-	set_write_mode(dev, WriteMode.PCM_A if block.type == PCMType.A else WriteMode.PCM_B, len(block.data), block.offset)
+	set_write_mode(dev, WriteMode.PCM_A if block.type == PCMType.A else WriteMode.PCM_B, len(block.data), block.remapped_offset)
 	ep.write(block.data, 20000)
 
 def send_pcm_blocks(dev, ep, pcm_blocks):
@@ -311,6 +299,18 @@ def preprocess_vgm(vgm):
 
 dev = usb.core.find(idVendor=0x1d50, idProduct=0x6147)
 
+# TEST:
+
+if LOCAL_VGM_PREPROCESS_TEST:
+	vgm = read_vgm(sys.argv[1])
+	processor = VGMPreprocessor()
+	processed_vgm = processor.preprocess(vgm)
+
+	print(processed_vgm)
+	sys.exit(0)
+
+###
+
 if dev is None:
 	print('Bitsy device found not found')
 	sys.exit(1)
@@ -331,7 +331,9 @@ if len(sys.argv) != 2:
 filename = sys.argv[1]
 
 vgm = read_vgm(filename)
-processed_vgm = preprocess_vgm(vgm)
+processor = VGMPreprocessor()
+processed_vgm = processor.preprocess(vgm)
+
 send_pcm_blocks(dev, data_ep, processed_vgm.pcm_blocks)
 send_vgm(dev, data_ep, processed_vgm.data)
 

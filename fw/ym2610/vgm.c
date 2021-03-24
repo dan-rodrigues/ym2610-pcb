@@ -87,16 +87,7 @@ void vgm_pcm_write(uint32_t *data, size_t offset, size_t length) {
 	uint32_t *psram = (void*)(PSRAM_MEM_BASE + offset);
 
 	for (size_t i = 0; i < length / 4; i++) {
-		uint32_t bytes = data[i];
-
-		// This could be done in the python script to save time
-		bytes =
-			(bytes >> 24 & 0xff) |
-			(bytes >> 8 & 0xff00) |
-			(bytes << 8 & 0xff0000) |
-			(bytes << 24 & 0xff000000);
-
-		psram[i] = bytes;
+		psram[i] = data[i];
 	}
 
 	if (log_pcm_write_blocks) {

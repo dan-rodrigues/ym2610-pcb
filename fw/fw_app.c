@@ -108,6 +108,7 @@ void main() {
 		size_t offset = 0;
 		enum ymu_write_mode mode = YMU_WM_UNDEFINED;
 
+		// FIXME: slower than it needs to be. should just do a direct copy into target memory
 		size_t length = ymu_data_poll(usb_data, &offset, &mode, 64);
 
 		if (length > 0) {
