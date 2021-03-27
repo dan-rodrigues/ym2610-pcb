@@ -23,6 +23,8 @@ from enum import Enum
 import threading
 import time
 
+###
+
 LOCAL_VGM_PREPROCESS_TEST = False
 
 ###
@@ -161,145 +163,7 @@ def start_polling_status(dev, status_ep, data_ep, processed_vgm):
 
 ###
 
-def preprocess_vgm(vgm):
-	relative_offset_index = 0x34
-	relative_offset = int.from_bytes(vgm[relative_offset_index : relative_offset_index + 4], byteorder='little')
-	start_index = relative_offset_index + relative_offset if relative_offset else 0x40
-	print("VGM start index: {:X}".format(start_index))
-
-	loop_offset_index = 0x1c
-	loop_offset = int.from_bytes(vgm[loop_offset_index : loop_offset_index + 4], byteorder='little')
-	loop_index = loop_offset + loop_offset_index if loop_offset else 0
-	print("VGM loop index: {:X}".format(loop_index))
-
-	index = start_index
-
-	processed_vgm = ProcessedVGM()
-	vgm_bytes = bytearray(vgm)
-
-	flag_writes_removed = 0
-
-	###
-
-	def remove_block(length):
-		nonlocal vgm_bytes, index, loop_index
-
-		end = index + length
-		del vgm_bytes[index : end]
-
-		# Loop index may need adjusting if removal of PCM block displaced it
-		if index < loop_index:
-			block_size = end - index
-			loop_index -= block_size
-
-		index -= 1
-
-	def check_reg_write():
-		nonlocal vgm_bytes, index, flag_writes_removed
-
-		REG_FLAGS = 0x1c
-
-		cmd = vgm_bytes[index + 0]
-		reg = vgm_bytes[index + 1]
-		address = cmd & 0x01
-
-		removed_bytes = 0
-
-		# Flag writes have no effect on playback and should be removed
-		if address == 0 and reg == REG_FLAGS:
-			removed_bytes = 3
-			remove_block(removed_bytes)
-			flag_writes_removed += 1
-
-		# YM2612 writes need to be remapped as YM2610 writes
-		if cmd in [0x52, 0x53]:
-			vgm_bytes[index] += 6
-
-		index += 2 - removed_bytes
-
-	###
-
-	while index < len(vgm_bytes):
-		cmd = vgm_bytes[index]
-
-		if cmd in [0x58, 0x59, 0x52, 0x53]:
-			check_reg_write()
-		elif (cmd & 0xf0) == 0x70:
-			pass
-		elif cmd == 0x61:
-			index += 2
-		elif cmd == 0x62 or cmd == 0x63:
-			pass
-		elif cmd == 0x66:
-			break
-		elif cmd == 0x4f:
-			# PSG stereo writes which sometimes appear but aren't used
-			remove_block(2)
-		elif cmd == 0x50:
-			# PSG write, needs mapping
-			remove_block(2)
-		elif (cmd & 0xf0) == 0x80:
-			# YM2612 PCM writes not supported
-			remove_block(1)
-		elif cmd == 0x67:
-			block_type = vgm_bytes[index + 2]
-			block_size = int.from_bytes(vgm_bytes[index + 3 : index + 7], byteorder='little')
-			block_size -= 8
-			if block_size <= 0:
-				print("Expected PCM block size to be > 0")
-
-			print('PCM block size: {:X}'.format(block_size))
-
-			if block_type != 0x82 and block_type != 0x83:
-				print("Unexpected block type: {:X}".format(block_type))
-				sys.exit(1)
-
-			total_size = int.from_bytes(vgm_bytes[index + 7 : index + 11], byteorder='little')
-			if total_size == 0:
-				print('Expected total_size to be > 0')
-				sys.exit(1)
-
-			offset = int.from_bytes(vgm_bytes[index + 11 : index + 15], byteorder='little')
-
-			is_adpcm_a = block_type == 0x82
-
-			print('Found block: type ', 'A' if is_adpcm_a else 'B')
-			print('Size: {:X}, offset: {:X}, total: {:X}'.format(block_size, offset, total_size))
-
-			# Some PCM blocks are 0 size for whatever reason, just ignore them
-			if block_size > 0:
-				pcm_block = PCMBlock()
-				pcm_block.offset = offset
-				pcm_block.data = vgm_bytes[index + 15 : index + 15 + block_size]
-				pcm_block.type = PCMType.A if is_adpcm_a else PCMType.B
-				processed_vgm.pcm_blocks.append(pcm_block)
-
-			# Remove PCM block portion from VGM as it's preloaded in separate write step(s)
-			remove_block(block_size + 15)
-
-		index += 1
-
-
-	# Reassign possibly adjusted loop offset due to PCM block removal above
-	adjusted_loop_offset = loop_index - loop_offset_index
-	loop_offset_bytes = adjusted_loop_offset.to_bytes(4, 'little')
-	vgm_bytes[loop_offset_index : loop_offset_index + 4] = loop_offset_bytes
-	print("VGM adjusted loop offset: {:X}".format(adjusted_loop_offset))
-
-	# Make immutable bytes object since this will be handled by another thread
-	processed_vgm.data = bytes(vgm_bytes)
-	print(processed_vgm)
-
-	if flag_writes_removed > 0:
-		print("Removed redundant flag writes: {:X}".format(flag_writes_removed))
-
-	return processed_vgm
-
-###
-
 dev = usb.core.find(idVendor=0x1d50, idProduct=0x6147)
-
-# TEST:
 
 if LOCAL_VGM_PREPROCESS_TEST:
 	vgm = read_vgm(sys.argv[1])
@@ -312,7 +176,7 @@ if LOCAL_VGM_PREPROCESS_TEST:
 ###
 
 if dev is None:
-	print('Bitsy device found not found')
+	print("Bitsy device found not found")
 	sys.exit(1)
 
 # Initial USB config
@@ -325,7 +189,7 @@ status_ep = get_status_ep(dev)
 # Read a VGM to send
 
 if len(sys.argv) != 2:
-	print('Expected one argument with filename')
+	print("Expected one argument with filename")
 	sys.exit(1)
 
 filename = sys.argv[1]

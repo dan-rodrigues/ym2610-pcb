@@ -8,10 +8,31 @@
 
 import sys
 from enum import Enum
+from psg_state import PSGState
+from opn_state import OPNState
 
 class PCMType(Enum):
 	A = 0
 	B = 1
+
+class ChipType(Enum):
+	YM2610 = 0,
+	YM2610B = 1,
+	YM2612 = 2,
+	SN76489 = 3
+
+class Chip:
+	ATTRIBUTES = [
+		(ChipType.YM2610, 0x4c, 0),
+		(ChipType.YM2610B, 0x4c, 1 << 31),
+		(ChipType.YM2612, 0x2c, 0),
+		(ChipType.SN76489, 0x0c, 0)
+	]
+
+	def __init__(self, chip_type, header_index, clock):
+		self.chip_type = chip_type
+		self.header_index = header_index
+		self.clock = clock
 
 class PCMBlock:
 	def __init__(self):
@@ -30,9 +51,7 @@ class ProcessedVGM:
 			.format(len(self.data), len(self.pcm_blocks))
 
 	def sort_pcm_blocks(self):
-		# FIXME:
-		# this could cause problems for ADPCMB samples sandwiched between A samples or vice versa
-		# for MERGED tracks, separate ones might have other issues
+		# TODO: revisit for the old tracks with separate address spaces
 		sorted(self.pcm_blocks, key=lambda block: block.offset + 0x1000000 if block.type == PCMType.B else 0)
 
 	def merge_contiguous_pcm_blocks(self):
@@ -135,13 +154,68 @@ class ProcessedVGM:
 		return None
 
 # This doesn't necessarily work for cases where (loop index < start index)
-# (Are there actually examples of this?)
+# (Any examples of this?)
 
 class VGMPreprocessor:
-	def __init__(self):
-		# Options? YM2612 reference clock?
-		# ...
-		pass
+	def __init__(self, assumed_clock=8000000):
+		self.assumed_clock = assumed_clock
+
+	def included_chips(self, vgm):
+		chips = []
+
+		for t in Chip.ATTRIBUTES:
+			index = t[1]
+			clock = int.from_bytes(vgm[index : index + 4], byteorder='little')
+			if clock == 0:
+				continue
+
+			presence_mask = t[2]
+			if (presence_mask != 0) and ((clock & presence_mask) == 0):
+				continue
+
+			chip_type = t[0]
+			chips.append(Chip(chip_type, index, clock))
+
+		return chips
+
+	def write_chip_header(self, vgm, chip_type, clock):
+		attributes = next(filter(lambda t: t[0] == chip_type, Chip.ATTRIBUTES), None)
+		if attributes is None:
+			print("write_chip_header: couldn't find chip_type")
+			sys.exit(1)
+
+		index = attributes[1]
+		header_clock = clock
+		if clock > 0:
+			header_clock |= attributes[2]
+
+		vgm[index : index + 4] = header_clock.to_bytes(4, 'little')
+
+	def byte_swap(self, data):
+		pcm_swapped = bytearray(len(data))
+
+		index = 0
+		while index < len(data):
+			temp = data[index + 0]
+			pcm_swapped[index + 0] = data[index + 3]
+			pcm_swapped[index + 3] = temp
+
+			temp = data[index + 1]
+			pcm_swapped[index + 1] = data[index + 2]
+			pcm_swapped[index + 2] = temp
+
+			index += 4
+
+		return pcm_swapped
+
+	def write_psg(self, vgm, actions):
+		for action in actions:
+			vgm.extend([0x58, action.address & 0xff, action.data])
+
+	def write_opnb(self, vgm, actions):
+		for action in actions:
+			write_cmd = 0x59 if action.address >= 0x100 else 0x58
+			vgm.extend([write_cmd, action.address & 0xff, action.data])
 
 	def preprocess(self, vgm_in):
 		relative_offset_index = 0x34
@@ -154,16 +228,37 @@ class VGMPreprocessor:
 		loop_index = loop_offset + loop_offset_index if loop_offset else 0
 		print("VGM loop index: {:X}".format(loop_index))
 
+		# What chips are included in this VGM?
+
+		chips = self.included_chips(vgm_in)
+		for chip in chips:
+			print("Found {:s} @ {:d}MHz".format(chip.chip_type.name, chip.clock))
+
+		ym2610_chip = next(filter(lambda c: c.chip_type == ChipType.YM2610, chips), None)
+		ym2612_chip = next(filter(lambda c: c.chip_type == ChipType.YM2612, chips), None)
+		psg_chip = next(filter(lambda c: c.chip_type == ChipType.SN76489, chips), None)
+
+		if (ym2610_chip is None) and (ym2612_chip is None):
+			print("Error: expected either YM2610 or YM2612")
+			sys.exit(1)
+
 		index = start_index
 		flag_writes_removed = 0
 
-		# ...
+		# VGM generation:
 
 		processed_vgm = ProcessedVGM()
 		vgm_out = bytearray()
 
 		# Copy existing header which will be updated later
-		vgm_out.extend(vgm_in[0x00 : start_index])
+		vgm_out.extend(vgm_in[0x00 : 0x100])
+
+		# Some tracks have a very low start index that overlaps with the header
+		# Bump the index if needed
+		if start_index < 0x100:
+			start_index = 0x100
+			start_index_bytes = (start_index - relative_offset_index).to_bytes(4, 'little')
+			vgm_out[relative_offset_index : relative_offset_index + 4] = start_index_bytes
 
 		# Loop index needs adjusting based on data being added / removed
 		loop_index_adjusted = None
@@ -173,23 +268,6 @@ class VGMPreprocessor:
 
 			vgm_out.extend(vgm_in[index : index + length])
 			index += length
-
-		def byte_swap(data):
-			pcm_swapped = bytearray(len(data))
-
-			index = 0
-			while index < len(data):
-				temp = data[index + 0]
-				pcm_swapped[index + 0] = data[index + 3]
-				pcm_swapped[index + 3] = temp
-
-				temp = data[index + 1]
-				pcm_swapped[index + 1] = data[index + 2]
-				pcm_swapped[index + 2] = temp
-
-				index += 4
-
-			return pcm_swapped
 
 		# PCM address remapping:
 
@@ -218,6 +296,16 @@ class VGMPreprocessor:
 				output_index = len(vgm_out) + 2
 				pcm_address_indexes.append(output_index)
 
+		# Track OPN/PSG state for upcoming conversion (from YM2612):
+
+		opn_state = None
+		if ym2612_chip is not None:
+			opn_state = OPNState(reference_clock=ym2612_chip.clock, target_clock=self.assumed_clock)
+
+		psg_state = None
+		if psg_chip is not None:
+			psg_state = PSGState(reference_clock=psg_chip.clock, target_clock=self.assumed_clock)
+			self.write_psg(vgm_out, psg_state.preamble())
 
 		while index < len(vgm_in):
 			if loop_index == index and loop_index_adjusted is None:
@@ -227,9 +315,42 @@ class VGMPreprocessor:
 			cmd = vgm_in[index]
 
 			if cmd in [0x58, 0x59]:
-				# Reg write
+				# YM2610 reg write
 				record_reg_write()
 				copy(3)
+			elif cmd in [0x52, 0x53]:
+				# YM2612 reg write
+				if opn_state is None:
+					print("Found YM2612 reg write but no YM2612 found in header")
+					sys.exit(1)
+
+				address = vgm_in[index + 1]
+				data = vgm_in[index + 2]
+				if cmd == 0x53:
+					address += 0x100
+
+				write_actions = opn_state.write(address, data)
+				self.write_opnb(vgm_out, write_actions)
+
+				index += 3
+			elif cmd == 0x4f:
+				# PSG stereo writes which sometimes appear but aren't used
+				index += 2
+			elif (cmd & 0xf0) == 0x80:
+				# YM2612 PCM writes not supported
+				index += 1
+			elif cmd == 0x50:
+				# PSG write, needs mapping
+				if psg_state is None:
+					print("Found PSG write but no PSG found in header")
+					sys.exit(1)
+
+				data = vgm_in[index + 1]
+
+				write_actions = psg_state.write(data)
+				self.write_opnb(vgm_out, write_actions)
+
+				index += 2
 			elif (cmd & 0xf0) == 0x70:
 				# Delay (4bit)
 				copy(1)
@@ -267,19 +388,19 @@ class VGMPreprocessor:
 
 				is_adpcm_a = (block_type == 0x82)
 
-				print('Found block: type ', 'A' if is_adpcm_a else 'B')
-				print('Size: {:X}, offset: {:X}, total: {:X}'.format(block_size, offset, total_size))
+				print("Found block: type ", "A" if is_adpcm_a else "B")
+				print("Size: {:X}, offset: {:X}, total: {:X}".format(block_size, offset, total_size))
 
 				# Some PCM blocks are 0 size for whatever reason, just ignore them
 				if block_size > 0:
 					pcm_block = PCMBlock()
 					pcm_block.offset = offset
-					pcm_swapped = byte_swap(vgm_in[index + 15 : index + 15 + block_size])
+					pcm_swapped = self.byte_swap(vgm_in[index + 15 : index + 15 + block_size])
 					pcm_block.data = pcm_swapped
 					pcm_block.type = PCMType.A if is_adpcm_a else PCMType.B
 					processed_vgm.pcm_blocks.append(pcm_block)
 
-				# Note the command is NOT copied, it's stripped out entirely
+				# The original PCM command block is stripped out
 				index += (block_size + 15)
 			else:
 				print("Unrecognized command byte: {:X}".format(cmd))
@@ -302,10 +423,15 @@ class VGMPreprocessor:
 			vgm_out[bank_index] = remapped_bank_byte
 
 		# Reassign loop index after possible displacement
-		loop_index_adjusted -= loop_offset_index
-		vgm_out[loop_offset_index : loop_offset_index + 4] = loop_index_adjusted.to_bytes(4, 'little')
-		print("VGM adjusted loop offset: {:X}".format(loop_index_adjusted))
+		if loop_index_adjusted is not None:
+			loop_index_adjusted -= loop_offset_index
+			vgm_out[loop_offset_index : loop_offset_index + 4] = loop_index_adjusted.to_bytes(4, 'little')
+			print("VGM adjusted loop offset: {:X}".format(loop_index_adjusted))
+
+		# In all cases, the output is a YM2610(B) VGM regardless of original input
+		self.write_chip_header(vgm_out, ChipType.YM2610B, self.assumed_clock)
+		self.write_chip_header(vgm_out, ChipType.SN76489, 0)
+		self.write_chip_header(vgm_out, ChipType.YM2612, 0)
 
 		processed_vgm.data = bytes(vgm_out)
-
 		return processed_vgm
