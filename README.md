@@ -8,7 +8,7 @@ The iCEBreaker Bitsy USB port is used to upload music data and also for control.
 
 ## Partially assembled PCB (v1.0.0)
 
-![v1.0.0 PCB partially assembled](photo/pcb2.jpg)
+![v1.0.0 PCB partially assembled](photo/pcb3.jpg)
 
 ## Video/Audio demos
 
