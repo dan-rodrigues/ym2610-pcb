@@ -2,7 +2,11 @@
 
 This project consists of a PCB, which works with a Teensy-form factor FPGA board (iCEBreaker Bitsy), which controls a Yamaha YM2610 (OPNB) FM synthesis / ADPCM / SSG sound chip. It also contains the software needed to play music in VGM format and supports MIDI input using the DIN-5 jack.
 
-ADPCM samples are fetched from the FPGA board PSRAM as needed. The host PCB itself doesn't include any extra memory, only some standard logic to mux the PCM buses to the limited number of FPGA IO available.
+Included is also an SoC implementation for the FPGA (in the `rtl/` directory) and firmware that runs on this SoC (in the `fw/` directory). There's also a set of helper scripts to control the SoC over the USB port.
+
+The goal is to make the complete system both low-cost and flexible which increases the complexity of the FPGA design but allows the use of cheaper hardware (i.e. a $35USD FPGA board and a fairly straightforward PCB).
+
+ADPCM samples are fetched from the FPGA board PSRAM. The host PCB itself doesn't include any extra memory, only some standard logic to mux the PCM buses to the limited number of FPGA IO available.
 
 The iCEBreaker Bitsy USB port is used to upload music data and also for control. The USB stack used and firmware can be customised as needed i.e. to allow a PC MIDI interface to drive the OPNB, or to record the raw digital output to store on a file, or any other possible use.
 
@@ -13,6 +17,36 @@ The iCEBreaker Bitsy USB port is used to upload music data and also for control.
 ## Video/Audio demos
 
 * [Metal Slug 2 soundtrack](https://www.youtube.com/watch?v=nlexW8DgMvw) - Neo Geo VGM playback demo using S/PDIF audio output.
+
+## Usage
+
+### Build and flash
+
+This project uses submodules which must be cloned first.
+
+```
+git submodule update --init --recursive
+```
+
+Building and flashing FPGA bitstream (which implements the SoC):
+
+```
+make dfuprog
+```
+
+Building and flashing SoC firmware:
+
+```
+make -C fw dfuprog
+```
+
+### Playing VGM files
+
+After flashing the firmware, the RGB LED should slowly flash indicating that it's ready to use.
+
+```
+./scripts/usb_ctrl.py track.vgm
+```
 
 ## TODO
 
