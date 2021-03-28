@@ -10,6 +10,7 @@ import sys
 
 from vgm_preprocess import VGMPreprocessor
 from vgm_preprocess import PCMType
+from vgm_reader import VGMReader
 
 import usb.core
 import usb.util
@@ -66,17 +67,6 @@ def get_status_ep(dev):
 		sys.exit(1)
 
 	return ep
-
-
-def read_vgm(path):
-	with open(path, "rb") as vgm_file:
-		vgm = vgm_file.read()
-
-	if len(vgm) == 0:
-		print("VGM file is empty: ", path)
-		sys.exit(1)
-
-	return vgm
 
 ###
 
@@ -161,19 +151,22 @@ def start_polling_status(dev, status_ep, data_ep, processed_vgm):
 	thread.start()
 	return (thread, stopping_event)
 
-###
-
-dev = usb.core.find(idVendor=0x1d50, idProduct=0x6147)
-
-if LOCAL_VGM_PREPROCESS_TEST:
-	vgm = read_vgm(sys.argv[1])
+def read_processed_vgm(vgm_path):
+	vgm = VGMReader.read(vgm_path)
 	processor = VGMPreprocessor()
 	processed_vgm = processor.preprocess(vgm)
+	return processed_vgm
 
+###
+
+if LOCAL_VGM_PREPROCESS_TEST:
+	processed_vgm = read_processed_vgm(sys.argv[1])
 	print(processed_vgm)
 	sys.exit(0)
 
 ###
+
+dev = usb.core.find(idVendor=0x1d50, idProduct=0x6147)
 
 if dev is None:
 	print("Bitsy device found not found")
@@ -193,10 +186,7 @@ if len(sys.argv) != 2:
 	sys.exit(1)
 
 filename = sys.argv[1]
-
-vgm = read_vgm(filename)
-processor = VGMPreprocessor()
-processed_vgm = processor.preprocess(vgm)
+processed_vgm = read_processed_vgm(filename)
 
 send_pcm_blocks(dev, data_ep, processed_vgm.pcm_blocks)
 send_vgm(dev, data_ep, processed_vgm.data)
