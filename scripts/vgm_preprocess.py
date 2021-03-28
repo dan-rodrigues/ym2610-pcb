@@ -166,7 +166,7 @@ class VGMPreprocessor:
 		for t in Chip.ATTRIBUTES:
 			index = t[1]
 			clock = int.from_bytes(vgm[index : index + 4], byteorder='little')
-			if clock == 0:
+			if (clock == 0) or (clock > 8000000):
 				continue
 
 			presence_mask = t[2]
@@ -232,7 +232,7 @@ class VGMPreprocessor:
 
 		chips = self.included_chips(vgm_in)
 		for chip in chips:
-			print("Found {:s} @ {:d}MHz".format(chip.chip_type.name, chip.clock))
+			print("Found {:s} @ {:d}Hz".format(chip.chip_type.name, chip.clock))
 
 		ym2610_chip = next(filter(lambda c: c.chip_type == ChipType.YM2610, chips), None)
 		ym2612_chip = next(filter(lambda c: c.chip_type == ChipType.YM2612, chips), None)
