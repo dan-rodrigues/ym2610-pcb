@@ -285,7 +285,7 @@ static enum usb_fnd_resp ymu_ctrl_req(struct usb_ctrl_req *req, struct usb_xfer 
 				return USB_FND_ERROR;
 			}
 
-			// Request is a write, we need to hold off until end of data phase */
+			// Request is a write, we need to hold off until end of data phase
 			g_cb_ctx.req = req;
 			g_cb_ctx.fn = ymu_ctrl_set_write_mode;
 			xfer->len = req->wLength;

@@ -50,9 +50,9 @@ class ProcessedVGM:
 		return "ProcessedVGM:\nCommand data length: {:X}\nPCM blocks: {:X}\n" \
 			.format(len(self.data), len(self.pcm_blocks))
 
-	def sort_pcm_blocks(self):
-		# TODO: revisit for the old tracks with separate address spaces
-		sorted(self.pcm_blocks, key=lambda block: block.offset + 0x1000000 if block.type == PCMType.B else 0)
+	def sort_pcm_blocks(self, assume_unified_pcm):
+		b_offset = 0 if assume_unified_pcm else 0x1000000
+		sorted(self.pcm_blocks, key=lambda block: block.offset + b_offset if block.type == PCMType.B else 0)
 
 	def merge_contiguous_pcm_blocks(self):
 		last_end_address = None
@@ -97,6 +97,7 @@ class ProcessedVGM:
 			return False
 
 		previous_end_bank = None
+		bank_crossed = False
 
 		previous_split_index = 0
 		index = 0
@@ -109,8 +110,7 @@ class ProcessedVGM:
 			block_end_bank = (block.offset + len(block.data)) >> 16
 			remapped_offset = block.offset & 0xffff
 
-			# FIXME: shouldn't be applied if a 1MB bank crossing just happened
-			if previous_end_bank is not None and (previous_end_bank != block_bank):
+			if not bank_crossed and previous_end_bank is not None and (previous_end_bank != block_bank):
 				base += 0x10000
 				previous_split_index = index
 
@@ -307,6 +307,10 @@ class VGMPreprocessor:
 			psg_state = PSGState(reference_clock=psg_chip.clock, target_clock=self.assumed_clock)
 			self.write_psg(vgm_out, psg_state.preamble())
 
+		# Total size must be tracked as it changes PCM block sorting
+
+		total_size = 0
+
 		while index < len(vgm_in):
 			if loop_index == index and loop_index_adjusted is None:
 				# End of newly written VGM is the new loop index
@@ -379,17 +383,20 @@ class VGMPreprocessor:
 					print("Unexpected block type: {:X}".format(block_type))
 					sys.exit(1)
 
-				total_size = int.from_bytes(vgm_in[index + 7 : index + 11], byteorder='little')
-				if total_size == 0:
+				block_total_size = int.from_bytes(vgm_in[index + 7 : index + 11], byteorder='little')
+				if block_total_size == 0:
 					print('Expected total_size to be > 0')
 					sys.exit(1)
+
+				total_size = max(block_total_size, total_size)
 
 				offset = int.from_bytes(vgm_in[index + 11 : index + 15], byteorder='little')
 
 				is_adpcm_a = (block_type == 0x82)
 
 				print("Found block: type ", "A" if is_adpcm_a else "B")
-				print("Size: {:X}, offset: {:X}, total: {:X}".format(block_size, offset, total_size))
+				print("Size: {:X}, offset: {:X}, total: {:X}".format(block_size, offset, block_total_size))
+
 
 				# Some PCM blocks are 0 size for whatever reason, just ignore them
 				if block_size > 0:
@@ -407,7 +414,8 @@ class VGMPreprocessor:
 				sys.exit(1)
 
 		# PCM blocks need sorting according to their position and type..
-		processed_vgm.sort_pcm_blocks()
+		assume_unified_pcm = (total_size >= 0x400000)
+		processed_vgm.sort_pcm_blocks(assume_unified_pcm)
 		# ..then possibly merged into contiguous blocks..
 		processed_vgm.merge_contiguous_pcm_blocks()
 		# ..then offsets need adjusting from a zero-base..
