@@ -193,7 +193,7 @@ bool ymu_playback_start_pending() {
 // Shared USB driver
 // ---------------------------------------------------------------------------
 
-/* Control handler structs */
+// Control request handling:
 
 typedef bool (*usb_control_fn)(uint16_t wValue, uint8_t *data, int *len);
 
@@ -239,6 +239,45 @@ static bool ymu_ctrl_set_write_mode(uint16_t wValue, uint8_t *data, int *len) {
 	return true;
 }
 
+// Functions of reach control request:
+
+typedef enum usb_fnd_resp (*ym_ctrl_handler)(struct usb_ctrl_req *req, struct usb_xfer *xfer);
+
+static enum usb_fnd_resp ymu_ctrl_read_status(struct usb_ctrl_req *req, struct usb_xfer *xfer) {
+	// (Temporary dummy status read)
+	xfer->data[0] = 0x55;
+	xfer->data[1] = 0xaa;
+	return USB_FND_SUCCESS;
+}
+
+static enum usb_fnd_resp ymu_ctrl_start_playback(struct usb_ctrl_req *req, struct usb_xfer *xfer) {
+	playback_start_pending = true;
+	return USB_FND_SUCCESS;
+}
+
+static enum usb_fnd_resp ymu_ctrl_defer_set_write_mode(struct usb_ctrl_req *req, struct usb_xfer *xfer) {
+	// Request is a write, we need to hold off until end of data phase
+	g_cb_ctx.req = req;
+	g_cb_ctx.fn = ymu_ctrl_set_write_mode;
+	xfer->len = req->wLength;
+	xfer->cb_done = ymu_ctrl_req_cb;
+	return USB_FND_SUCCESS;
+}
+
+struct ym_ctrl_handler {
+	enum ymu_ctrl_req request;
+	bool is_read;
+	ym_ctrl_handler handler;
+};
+
+static struct ym_ctrl_handler ctrl_handlers[] = {
+	{.request = YMU_CTRL_READ_STATUS, .is_read = true, .handler = ymu_ctrl_read_status},
+	{.request = YMU_CTRL_START_PLAYBACK, .is_read = false, .handler = ymu_ctrl_start_playback},
+	{.request = YMU_CTRL_SET_WRITE_MODE, .is_read = false, .handler = ymu_ctrl_defer_set_write_mode}
+};
+
+// Control request dispatch:
+
 static enum usb_fnd_resp ymu_ctrl_req(struct usb_ctrl_req *req, struct usb_xfer *xfer) {
 	printf("audio ctrl req: %X\n", req->bRequest);
 
@@ -252,50 +291,29 @@ static enum usb_fnd_resp ymu_ctrl_req(struct usb_ctrl_req *req, struct usb_xfer 
 		return USB_FND_ERROR;
 	}
 
+	static const size_t handler_count = sizeof(ctrl_handlers) / sizeof(ym_ctrl_handler);
 	bool is_read = USB_REQ_IS_READ(req);
 
-	// FIXME: the is_read thing could use some cleanup
-	// some light struct as the original audio.c did
-	
-	switch (req->bRequest) {
-		case YMU_CTRL_READ_STATUS: {
-			if (!is_read) {
-				printf("YMU_CTRL_READ_STATUS received, but request isn't a read\n");
-				return USB_FND_ERROR;
-			}
+	for (uint32_t i = 0; i < handler_count; i++) {
+		const struct ym_ctrl_handler *ctx = &ctrl_handlers[i];
 
-			// Temporary dummy status read...
-			xfer->data[0] = 0x55;
-			xfer->data[1] = 0xaa;
-			return USB_FND_SUCCESS;
-		} break;
-		case YMU_CTRL_START_PLAYBACK: {
-			if (is_read) {
-				// ...
-				printf("expected read for playback\n");
-				return USB_FND_ERROR;
-			}
+		if (ctx->request != req->bRequest) {
+			continue;
+		}
 
-			playback_start_pending = true;
-			return USB_FND_SUCCESS;
-		} break;
-		case YMU_CTRL_SET_WRITE_MODE: {
-			if (is_read) {
-				printf("YMU_CTRL_SET_WRITE_MODE received, but request isn't a write\n");
-				return USB_FND_ERROR;
-			}
+		if (is_read ^ ctx->is_read) {
+			printf("Control request RW type mismatch\n");
+			return USB_FND_ERROR;
+		}
 
-			// Request is a write, we need to hold off until end of data phase
-			g_cb_ctx.req = req;
-			g_cb_ctx.fn = ymu_ctrl_set_write_mode;
-			xfer->len = req->wLength;
-			xfer->cb_done = ymu_ctrl_req_cb;
-			return USB_FND_SUCCESS;
-		} break;
+		return ctx->handler(req, xfer);
 	}
 
+	printf("Couldn't find match control request handler\n");
 	return USB_FND_ERROR;
 }
+
+// Shared driver definition:
 
 static struct usb_fn_drv _ymu_drv = {
 	.ctrl_req = ymu_ctrl_req,
