@@ -1,6 +1,6 @@
 # YM2610 PCB (WIP)
 
-This project consists of a PCB, which works with a Teensy-form factor FPGA board (iCEBreaker Bitsy), which controls a Yamaha YM2610 (OPNB) FM synthesis / ADPCM / SSG sound chip. It also contains the software needed to play music in VGM format and supports MIDI input using the DIN-5 jack.
+This project allows the user to control a YM2610(B) FM synthesis / ADPCM / SSG sound chip. Software is included to play back YM2610(B) VGM files which includes any Neo Geo arcade game and various others. It can also play certain Sega Genesis tracks using an included converter script. There is also a MIDI input that can be paired with new software to control the synth.
 
 Included is also an SoC implementation for the FPGA (in the `rtl/` directory) and firmware that runs on this SoC (in the `fw/` directory). There's also a set of helper scripts to control the SoC over the USB port.
 
