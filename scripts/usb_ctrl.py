@@ -123,14 +123,14 @@ def poll_status(stopping_event, status_ep, data_ep, processed_vgm):
 			status_data = status_ep.read(STATUS_TOTAL_LENGTH, 250)
 			print("Received status data: ", binascii.hexlify(status_data))
 
-			header = int.from_bytes(status_data[0 : 4], byteorder='little')
+			header = int.from_bytes(status_data[0 : 4], 'little')
 			if header != BUFFERING_REQUEST_HEADER:
 				print("Ignoring request with header: ", header)
 				continue
 
-			buffer_target_offset = int.from_bytes(status_data[4 : 8], byteorder='little')
-			vgm_start_offset = int.from_bytes(status_data[8 : 12], byteorder='little')
-			vgm_chunk_length = int.from_bytes(status_data[12 : 16], byteorder='little')
+			buffer_target_offset = int.from_bytes(status_data[4 : 8], 'little')
+			vgm_start_offset = int.from_bytes(status_data[8 : 12], 'little')
+			vgm_chunk_length = int.from_bytes(status_data[12 : 16], 'little')
 
 			print("Sending VGM chunk to buffer @ {:X}, VGM offset: {:X}, Length: {:X}"\
 				  .format(buffer_target_offset, vgm_start_offset, vgm_chunk_length))

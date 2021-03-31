@@ -23,7 +23,7 @@ output_path = sys.argv[2]
 
 vgm = VGMReader.read(input_path)
 processor = VGMPreprocessor()
-processed_vgm = processor.preprocess(vgm)
+processed_vgm = processor.preprocess(vgm, rewrite_pcm=True, byteswap_pcm=False)
 
 # Write converted output
 
