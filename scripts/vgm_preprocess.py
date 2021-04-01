@@ -54,30 +54,6 @@ class ProcessedVGM:
 		b_offset = 0 if assume_unified_pcm else 0x1000000
 		sorted(self.pcm_blocks, key=lambda block: block.offset + b_offset if block.type == PCMType.B else 0)
 
-	def merge_contiguous_pcm_blocks(self):
-		last_end_address = None
-		indexes_to_remove = []
-
-		for i in range(0, len(self.pcm_blocks)):
-			block = self.pcm_blocks[i]
-			if last_end_address is None:
-				last_end_address = block.offset + len(block.data)
-				continue
-
-			if last_end_address == block.offset:
-				# Blocks needs merging to prevent discontinuity when rebasing
-				merged_block = self.pcm_blocks[i - 1]
-				merged_block.data.extend(block.data)
-				indexes_to_remove.append(i)
-
-			last_end_address = block.offset + len(block.data)
-
-		indexes_to_remove.reverse()
-		for i in indexes_to_remove:
-			del self.pcm_blocks[i]
-
-		print("Merged {:d} PCM blocks".format(len(indexes_to_remove)))
-
 	def rebase_pcm_blocks(self):
 		base = 0
 
@@ -157,8 +133,6 @@ class ProcessedVGM:
 		# PCM blocks need sorting according to their position and type..
 		assume_unified_pcm = (total_size >= 0x400000)
 		self.sort_pcm_blocks(assume_unified_pcm)
-		# ..then possibly merged into contiguous blocks..
-		self.merge_contiguous_pcm_blocks()
 		# ..then offsets need adjusting from a zero-base..
 		self.rebase_pcm_blocks()
 		# ..then the address high bytes need adjusting according to the newly sorted position
