@@ -18,7 +18,7 @@ class OPNState:
 		self.reference_clock = reference_clock
 		self.target_clock = target_clock
 		self.pitch_factor = (reference_clock << 32) // target_clock
-		self.pitches = [0] * 6
+		self.pitches = [0] * 12
 
 	def write(self, address, data):
 		hi_address_map = {
@@ -27,7 +27,14 @@ class OPNState:
 			0x0a6: 2,
 			0x1a4: 3,
 			0x1a5: 4,
-			0x1a6: 5
+			0x1a6: 5,
+			# "2CH mode"
+			0x0ac: 6,
+			0x0ad: 7,
+			0x0ae: 8,
+			0x1ac: 9,
+			0x1ad: 10,
+			0x1ae: 11
 		}
 
 		lo_address_map = {
@@ -36,8 +43,28 @@ class OPNState:
 			0x0a2: 2,
 			0x1a0: 3,
 			0x1a1: 4,
-			0x1a2: 5
+			0x1a2: 5,
+			# "2CH mode"
+			0x0a8: 6,
+			0x0a9: 7,
+			0x0aa: 8,
+			0x1a8: 9,
+			0x1a9: 10,
+			0x1aa: 11
 		}
+
+		# Filtering all DAC writes as they are handled externally
+		if address in [0x02a, 0x02b]:
+			return []
+
+		# This would filter out writes to FM CH6 key-on
+		# Attempts to key-on CH6 while DAC is playing might cause issues
+		# This shouldn't happen either way so it's commented out for now
+		
+		# if address == 0x28:
+		# 	if (data & 0x7) == 6:
+		# 		print("Filtering CH6.. ")
+		# 		return []
 
 		index = hi_address_map.get(address, None)
 		if index is not None:

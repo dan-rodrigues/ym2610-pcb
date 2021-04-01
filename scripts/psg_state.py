@@ -58,6 +58,7 @@ class PSGState:
 		else:
 			# Noise control
 			# (not implemented for now, would need to "steal" one of three SSG voices for this)
+			print("PSG: Ignoring noise control write (TODO) ")
 			return []
 
 	def data_write(self, combined):
