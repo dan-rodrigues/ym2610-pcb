@@ -14,7 +14,8 @@
 `include "boards.vh"
 
 module top #(
-	parameter [0:0] ENABLE_DAC_DEBUG_REGS = 0
+	parameter [0:0] ENABLE_DAC_DEBUG_REGS = 0,
+	parameter [0:0] ENABLE_MIDI = 1
 ) (
 	// SPI
 	inout  wire [3:0] spi_io,
@@ -247,10 +248,9 @@ module top #(
 
 	assign wb_rdata[5] = 0;
 
-	// Audio PCM [6]
+	// (Unused) [6]
 	// -------------
 
-	// (removed)
 	assign wb_rdata[6] = 0;
 	assign wb_ack[6] = wb_cyc[6];
 
@@ -262,7 +262,8 @@ module top #(
 		.DW(WB_DW)
 	) midi_I (
 		.uart_tx  (),
-		.uart_rx  (midi_rx),
+		.uart_rx  (ENABLE_MIDI ? midi_rx : 1),
+
 		.wb_addr  (wb_addr[1:0]),
 		.wb_rdata (wb_rdata[7]),
 		.wb_we    (wb_we),
