@@ -1,4 +1,4 @@
-# YM2610 PCB (WIP)
+# YM2610 PCB
 
 This project allows the user to control a YM2610(B) FM synthesis / ADPCM / SSG sound chip. Software is included to play back YM2610(B) VGM files which includes any Neo Geo arcade game and various others. It can also play certain Sega Genesis tracks using an included converter script. There is also a MIDI input that can be paired with new software to control the synth.
 
@@ -10,9 +10,32 @@ ADPCM samples are fetched from the FPGA board PSRAM. The host PCB itself doesn't
 
 The iCEBreaker Bitsy USB port is used to upload music data and also for control. The USB stack used and firmware can be customised as needed i.e. to allow a PC MIDI interface to drive the OPNB, or to record the raw digital output to store on a file, or any other possible use.
 
-## Partially assembled PCB (v1.0.0)
+## Features
 
-![v1.0.0 PCB partially assembled](photo/pcb3.jpg)
+### I/O
+
+* S/PDIF compatible outputs. The digital sound sources from the OPNB (FM/PCM) can be heard using this output. The analog sound source (SSG) can only be heard with the 3.5mm analog outputs. Optical and coax outputs are included.
+* 3.5mm line out.
+* 3.5mm headphone out with attenutation pot.
+* Separate attenuation pots for the combined FM/PCM and separate SSG sound sources. Their levels can be adjusted or muted independently.
+* MIDI input (DIN-5). Default firmware includes library functions to read the MIDI messages into a minimal struct. There's also a simple FM demo.
+* 2x user buttons. The default firmware uses them to cycle through the available sound sources.
+
+The S/PDIF output is resampled to 48KHz and can be used to hear the original lossless output from the OPNB. It doesn't include the analog SSG output but most tracks don't use it.
+
+The analog outputs include an active low pass filter (fC = approx 17KHz), independent attenutation pots for each sound source and can also be used to hear the SSG output.
+
+### Debug
+
+These aren't required but can be useful for debugging.
+
+* UART header
+* CRESET jumper
+* CRESET button
+
+## Assembled PCB (v1.0.1)
+
+![v1.0.1 PCB assembled](photo/pcb4.jpg)
 
 ## Video/Audio demos
 
@@ -50,8 +73,4 @@ After flashing the firmware, the RGB LED should slowly flash indicating that it'
 ```
 ./scripts/usb_ctrl.py track.vgm
 ```
-
-## TODO
-
-A new revision of the PCB with many changes to the analog section is also being tested. What's currently in the main branch is out of date but the newer revision will be available in one of the non-default branches.
 
