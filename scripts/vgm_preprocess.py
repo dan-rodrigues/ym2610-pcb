@@ -43,12 +43,52 @@ class PCMBlock:
 
 class ProcessedVGM:
 	def __init__(self):
-		self.data = []
+		self.data = bytearray()
 		self.pcm_blocks = []
 
 	def __repr__(self):
 		return "ProcessedVGM:\nCommand data length: {:X}\nPCM blocks: {:X}\n" \
 			.format(len(self.data), len(self.pcm_blocks))
+
+	# VGM writing:
+
+	def write_header_offset(self, header_index, file_index):
+		file_offset = file_index - header_index
+		self.data[header_index : header_index + 4] = file_offset.to_bytes(4, 'little')
+		return file_offset
+
+	def write_header_word(self, header_index, word):
+		self.data[header_index : header_index + 4] = word.to_bytes(4, 'little')
+
+	def displace_header_offset(self, header_index, delta):
+		file_offset_bytes = self.data[header_index : header_index + 4]
+		file_offset = int.from_bytes(file_offset_bytes, 'little') + header_index
+		file_offset += delta
+		self.write_header_offset(header_index, file_offset)
+
+	def write_psg(self, actions):
+		for action in actions:
+			self.data.extend([0x58, action.address & 0xff, action.data])
+
+	def write_opnb(self, actions):
+		for action in actions:
+			write_cmd = 0x59 if action.address >= 0x100 else 0x58
+			self.data.extend([write_cmd, action.address & 0xff, action.data])
+
+	def write_chip_header(self, chip_type, clock):
+		attributes = next(filter(lambda t: t[0] == chip_type, Chip.ATTRIBUTES), None)
+		if attributes is None:
+			print("write_chip_header: couldn't find chip_type")
+			sys.exit(1)
+
+		index = attributes[1]
+		header_clock = clock
+		if clock > 0:
+			header_clock |= attributes[2]
+
+		self.data[index : index + 4] = header_clock.to_bytes(4, 'little')
+
+	# PCM:
 
 	def sort_pcm_blocks(self, assume_unified_pcm):
 		b_offset = 0 if assume_unified_pcm else 0x1000000
@@ -188,19 +228,6 @@ class VGMPreprocessor:
 
 		return chips
 
-	def write_chip_header(self, vgm, chip_type, clock):
-		attributes = next(filter(lambda t: t[0] == chip_type, Chip.ATTRIBUTES), None)
-		if attributes is None:
-			print("write_chip_header: couldn't find chip_type")
-			sys.exit(1)
-
-		index = attributes[1]
-		header_clock = clock
-		if clock > 0:
-			header_clock |= attributes[2]
-
-		vgm[index : index + 4] = header_clock.to_bytes(4, 'little')
-
 	def byte_swap(self, data):
 		pcm_swapped = bytearray(len(data))
 
@@ -218,43 +245,18 @@ class VGMPreprocessor:
 
 		return pcm_swapped
 
-	def write_psg(self, vgm, actions):
-		for action in actions:
-			vgm.extend([0x58, action.address & 0xff, action.data])
-
-	def write_opnb(self, vgm, actions):
-		for action in actions:
-			write_cmd = 0x59 if action.address >= 0x100 else 0x58
-			vgm.extend([write_cmd, action.address & 0xff, action.data])
-
 	def preprocess(self, vgm_in, rewrite_pcm=False, byteswap_pcm=True):
 		flag_writes_removed = 0
 
 		processed_vgm = ProcessedVGM()
-		vgm_out = bytearray()
 
 		def copy(length):
-			nonlocal index, vgm_in, vgm_out
+			nonlocal index, vgm_in
 
-			vgm_out.extend(vgm_in[index : index + length])
+			processed_vgm.data.extend(vgm_in[index : index + length])
 			index += length
 
 		# Header adjustments:
-
-		def write_header_offset(header_index, file_index):
-			nonlocal vgm_out
-
-			file_offset = file_index - header_index
-			vgm_out[header_index : header_index + 4] = file_offset.to_bytes(4, 'little')
-			return file_offset
-
-		def displace_header_offset(header_index, delta):
-			nonlocal vgm_out
-
-			file_offset_bytes = vgm_out[header_index : header_index + 4]
-			file_offset = int.from_bytes(file_offset_bytes, 'little') + header_index
-			file_offset += delta
-			write_header_offset(header_index, file_offset)
 
 		def read_header_offset(header_index):
 			nonlocal vgm_in
@@ -262,11 +264,6 @@ class VGMPreprocessor:
 			file_offset_bytes = vgm_in[header_index : header_index + 4]
 			file_offset = int.from_bytes(file_offset_bytes, 'little')
 			return file_offset + header_index if file_offset > 0 else 0
-
-		def write_header_word(header_index, word):
-			nonlocal vgm_out
-
-			vgm_out[header_index : header_index + 4] = word.to_bytes(4, 'little')
 
 		# Read source indexes (from relative offsets):
 		relative_offset_index = 0x34
@@ -294,28 +291,28 @@ class VGMPreprocessor:
 			sys.exit(1)
 
 		# Copy existing header which will be updated later
-		vgm_out.extend(vgm_in[0x00 : 0x100])
+		processed_vgm.data.extend(vgm_in[0x00 : 0x100])
 		# Clear any leftover junk in the header incase
 		if start_index < 0x100:
-			vgm_out[start_index : 0x100] = [0] * (0x100 - start_index)
+			processed_vgm.data[start_index : 0x100] = [0] * (0x100 - start_index)
 		# Preserve existing loop params if present
 		if start_index < 0x80:
 			loop_base_index = 0x7e
 			loop_modifier_index = 0x7f
-			vgm_out[loop_base_index] = 0
-			vgm_out[loop_modifier_index] = 0
+			processed_vgm.data[loop_base_index] = 0
+			processed_vgm.data[loop_modifier_index] = 0
 
 		# Bump version to 1.70 as some versions predate YM2610(B) support
 		version_index = 0x08
 		output_version = 0x00000170
-		write_header_word(version_index, output_version)
+		processed_vgm.write_header_word(version_index, output_version)
 
 		# Bump the index to 0x100 to make space for full-size header, if needed
 		# Some tracks may have a shorter header by setting a lower start-offset
 		minimum_start_index = 0x100
 		if start_index < minimum_start_index:
 			start_index = minimum_start_index
-			write_header_offset(relative_offset_index, start_index)
+			processed_vgm.write_header_offset(relative_offset_index, start_index)
 
 		# Loop index needs adjusting based on data being added / removed
 		loop_index_adjusted = None
@@ -325,7 +322,7 @@ class VGMPreprocessor:
 		pcm_address_indexes = []
 
 		def record_reg_write():
-			nonlocal index, vgm_in, vgm_out, pcm_address_indexes
+			nonlocal index, vgm_in, pcm_address_indexes
 
 			data_index = index + 2
 
@@ -344,7 +341,7 @@ class VGMPreprocessor:
 
 			if is_high_address:
 				# This address will need adjusting later
-				output_index = len(vgm_out) + 2
+				output_index = len(processed_vgm.data) + 2
 				pcm_address_indexes.append(output_index)
 
 		# Track OPN/PSG state for upcoming conversion (from YM2612):
@@ -356,7 +353,7 @@ class VGMPreprocessor:
 		psg_state = None
 		if psg_chip is not None:
 			psg_state = PSGState(reference_clock=psg_chip.clock, target_clock=self.assumed_clock)
-			self.write_psg(vgm_out, psg_state.preamble())
+			processed_vgm.write_psg(psg_state.preamble())
 
 		# Total size must be tracked as it changes PCM block sorting
 
@@ -365,7 +362,7 @@ class VGMPreprocessor:
 		while index < len(vgm_in):
 			if loop_index == index and loop_index_adjusted is None:
 				# End of newly written VGM is the new loop index
-				loop_index_adjusted = len(vgm_out)
+				loop_index_adjusted = len(processed_vgm.data)
 
 			cmd = vgm_in[index]
 
@@ -385,7 +382,7 @@ class VGMPreprocessor:
 					address += 0x100
 
 				write_actions = opn_state.write(address, data)
-				self.write_opnb(vgm_out, write_actions)
+				processed_vgm.write_opnb(write_actions)
 
 				index += 3
 			elif cmd == 0x4f:
@@ -403,7 +400,7 @@ class VGMPreprocessor:
 				data = vgm_in[index + 1]
 
 				write_actions = psg_state.write(data)
-				self.write_opnb(vgm_out, write_actions)
+				processed_vgm.write_opnb(write_actions)
 
 				index += 2
 			elif (cmd & 0xf0) == 0x70:
@@ -470,34 +467,31 @@ class VGMPreprocessor:
 
 		# Reassign loop index after possible displacement
 		if loop_index_adjusted is not None:
-			loop_offset_adjusted = write_header_offset(loop_offset_index, loop_index_adjusted)
+			loop_offset_adjusted = processed_vgm.write_header_offset(loop_offset_index, loop_index_adjusted)
 			print("VGM adjusted loop offset: {:X}".format(loop_offset_adjusted))
 
 		# Now that PCM blocks are extracted, they need preprocessing too
-		# FIXME: multiple references and updates to same bytearray isn't great, refactor as part of cleanup
-		processed_vgm.data = vgm_out
 		processed_vgm.preprocess_pcm(pcm_address_indexes, total_size)
 
 		if rewrite_pcm:
 			total_pcm_size = processed_vgm.write_pcm_blocks(start_index, total_size)
 			# Bump loop index which may have been assigned already
-			displace_header_offset(loop_offset_index, total_pcm_size)
+			processed_vgm.displace_header_offset(loop_offset_index, total_pcm_size)
 
 		# Remove GD3 data as it wasn't copied here (trying to save space, but could add it as an option)
 		gd3_offset_index = 0x14
 		gd3_input_index = read_header_offset(gd3_offset_index)
-		write_header_offset(gd3_offset_index, len(vgm_out))
+		processed_vgm.write_header_offset(gd3_offset_index, len(processed_vgm.data))
 		# Copied GD3 region assumes it spans (index..<eof)
-		vgm_out.extend(vgm_in[gd3_input_index : gd3_input_index + len(vgm_in)])
+		processed_vgm.data.extend(vgm_in[gd3_input_index : gd3_input_index + len(vgm_in)])
 
 		# Reassign EOF offset (this particular hardware player doesn't check it but others do)
 		eof_offset_index = 0x04
-		write_header_offset(eof_offset_index, len(vgm_out))
+		processed_vgm.write_header_offset(eof_offset_index, len(processed_vgm.data))
 
 		# In all cases, the output is a YM2610(B) VGM regardless of original input
-		self.write_chip_header(vgm_out, ChipType.YM2610B, self.assumed_clock)
-		self.write_chip_header(vgm_out, ChipType.SN76489, 0)
-		self.write_chip_header(vgm_out, ChipType.YM2612, 0)
+		processed_vgm.write_chip_header(ChipType.YM2610B, self.assumed_clock)
+		processed_vgm.write_chip_header(ChipType.SN76489, 0)
+		processed_vgm.write_chip_header(ChipType.YM2612, 0)
 
-		processed_vgm.data = bytes(vgm_out)
 		return processed_vgm
