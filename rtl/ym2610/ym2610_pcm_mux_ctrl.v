@@ -277,7 +277,6 @@ module ym2610_pcm_mux_ctrl #(
 	) ym_io_sbio [3:0] (
 		.OUTPUT_CLK(clk),
 		.INPUT_CLK(clk),
-		.CLOCK_ENABLE(1'b1),
 
 		.PACKAGE_PIN(ym_io),
 		.OUTPUT_ENABLE(ym_io_en_nx),
@@ -299,7 +298,6 @@ module ym2610_pcm_mux_ctrl #(
 	) ym_pcm_mux_ctrl_sbio [4:0] (
 		.OUTPUT_CLK(clk),
 		.INPUT_CLK(clk),
-		.CLOCK_ENABLE(1'b1),
 
 		.PACKAGE_PIN({mux_oe_n, pcm_load, mux_sel}),
 		.D_OUT_0({mux_oe_n_nx, pcm_load_nx, mux_sel_nx})
@@ -318,7 +316,6 @@ module ym2610_pcm_mux_ctrl #(
 	) ym_mpx_sbio [1:0] (
 		.INPUT_CLK(clk),
 		.OUTPUT_CLK(clk),
-		.CLOCK_ENABLE(1'b1),
 
 		.PACKAGE_PIN({pmpx, rmpx}),
 		.D_IN_0({pmpx_in, rmpx_in})

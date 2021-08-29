@@ -262,7 +262,7 @@ module top #(
 		.DW(WB_DW)
 	) midi_I (
 		.uart_tx  (),
-		.uart_rx  (ENABLE_MIDI ? midi_rx : 1),
+		.uart_rx  (ENABLE_MIDI ? midi_rx : 1'b1),
 
 		.wb_addr  (wb_addr[1:0]),
 		.wb_rdata (wb_rdata[7]),
@@ -431,7 +431,6 @@ module top #(
 	) btn_sbio [1:0] (
 		.INPUT_CLK(clk_24m),
 		.OUTPUT_CLK(clk_24m),
-		.CLOCK_ENABLE(1'b1),
 
 		.PACKAGE_PIN({btn_b, btn_a}),
 		.D_IN_0({btn_b_r, btn_a_r})
@@ -546,7 +545,6 @@ module top #(
 		.NEG_TRIGGER(1'b0),
 		.IO_STANDARD("SB_LVCMOS")
 	) spdif_tx_sbio (
-		.CLOCK_ENABLE(1'b1),
 		.OUTPUT_CLK(clk_24m),
 		.INPUT_CLK(clk_24m),
 
@@ -645,7 +643,6 @@ module top #(
 	) ym_clk_sbio (
 		.OUTPUT_CLK(clk_24m),
 		.INPUT_CLK(clk_24m),
-		.CLOCK_ENABLE(1'b1),
 
 		.PACKAGE_PIN(ym_clk),
 		.D_OUT_0(clk_8m_p),
