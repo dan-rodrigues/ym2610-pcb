@@ -11,6 +11,7 @@ struct vgm_player_context {
 	bool initialized;
 
 	uint32_t index;
+	uint32_t start_offset;
 
 	uint32_t buffer_index;
 	uint32_t previous_buffer_index;

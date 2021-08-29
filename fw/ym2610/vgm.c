@@ -183,10 +183,12 @@ static void vgm_player_init(struct vgm_player_context *ctx) {
 	relative_offset |= vgm[relative_offset_index + 2] << 16;
 	relative_offset |= vgm[relative_offset_index + 3] << 24;
 
-	ctx->index = relative_offset ? relative_offset_index + relative_offset : 0x40;
+	uint32_t start_offset = relative_offset ? relative_offset_index + relative_offset : 0x40;
+	ctx->start_offset = start_offset;
+	ctx->index = start_offset;
+	ctx->buffer_index = start_offset;
+	ctx->previous_buffer_index = start_offset;
 
-	ctx->buffer_index = ctx->index;
-	ctx->previous_buffer_index = ctx->buffer_index;
 	ctx->loop_buffer_loaded = false;
 
 	// VGM loop offset (optional)
@@ -242,7 +244,7 @@ static uint8_t vgm_player_read_byte(struct vgm_player_context *ctx, struct vgm_u
 	uint8_t byte = vgm[ctx->buffer_index++];
 
 	// ..did we just finish reading the loop-start region?
-	if (!ctx->loop_buffer_loaded && (ctx->buffer_index == buffer_a_offset)) {
+	if (!ctx->loop_buffer_loaded && ctx->loop_offset && (ctx->buffer_index == buffer_a_offset)) {
 		// One-time loading of the loop-start region (first data accessed upon looping)
 		vgm_player_request_loop_buffering(ctx, result, buffer_loop_offset, buffer_size);
 		ctx->loop_buffer_loaded = true;
@@ -266,21 +268,34 @@ static uint8_t vgm_player_read_byte(struct vgm_player_context *ctx, struct vgm_u
 }
 
 static void vgm_reset_initial_buffer(struct vgm_player_context *ctx, struct vgm_update_result *result) {
+	ctx->index = ctx->loop_offset;
+
 	if (ctx->loop_buffer_loaded) {
-		ctx->index = ctx->loop_offset;
+		// Target the previously loaded loop buffer for reading..
 		ctx->buffer_index = buffer_loop_offset;
 		ctx->previous_buffer_index = ctx->buffer_index;
 
-		result->buffering_needed = true;
-		result->buffer_target_offset = buffer_a_offset;
+		// ..then writing starts after the loop buffer
 		result->vgm_start_offset = ctx->loop_offset + buffer_size;
-		result->vgm_chunk_length = buffer_size * 2;
-	} else {
-		// No buffering needed since double-buffer region was never entered
-		ctx->index = ctx->loop_offset;
+	} else if (ctx->loop_offset) {
+		// Reload buffer A/B (whether or not it's actually used)
 		ctx->buffer_index = ctx->loop_offset;
 		ctx->previous_buffer_index = ctx->buffer_index;
+
+		result->vgm_start_offset = buffer_a_offset;
+	} else {
+		// No looping, start over from beginning
+		uint32_t start_offset = ctx->start_offset;
+		ctx->index = start_offset;
+		ctx->buffer_index = start_offset;
+		ctx->previous_buffer_index = start_offset;
+
+		result->vgm_start_offset = buffer_a_offset;
 	}
+
+	result->buffering_needed = true;
+	result->buffer_target_offset = buffer_a_offset;
+	result->vgm_chunk_length = buffer_size * 2;
 }
 
 static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_update_result *result) {
@@ -334,15 +349,12 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_upd
 				ctx->loop_count++;
 
 				if (ctx->loop_offset) {
-					vgm_reset_initial_buffer(ctx, result);
-
 					printf("Looping..\n\n");
 				} else {
-					// If there's no loop, just restart the player
-					vgm_player_init(ctx);
-
 					printf("Restarting..\n\n");
 				}
+
+				vgm_reset_initial_buffer(ctx, result);
 
 				return 0;
 			}
