@@ -14,6 +14,7 @@ struct vgm_player_context {
 
 	uint32_t buffer_index;
 	uint32_t previous_buffer_index;
+	bool loop_buffer_loaded;
 
 	uint32_t loop_offset;
 	uint32_t loop_count;
