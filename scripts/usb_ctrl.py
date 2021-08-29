@@ -115,6 +115,7 @@ def poll_status(stopping_event, status_ep, data_ep, processed_vgm):
 	print("Polling for status...")
 
 	vgm_data = processed_vgm.data
+	sequence_counter = 0
 
 	while not stopping_event.is_set():
 		try:
@@ -125,9 +126,17 @@ def poll_status(stopping_event, status_ep, data_ep, processed_vgm):
 			print("Received status data: ", binascii.hexlify(status_data))
 
 			header = int.from_bytes(status_data[0 : 4], 'little')
-			if header != BUFFERING_REQUEST_HEADER:
+			if (header & 0xff) != BUFFERING_REQUEST_HEADER:
 				print("Ignoring request with header: ", header)
 				continue
+
+			sequence_counter_received = header >> 8
+			if sequence_counter != sequence_counter_received:
+				print("Ignoring request with nonsequential counter: ", header)
+				continue
+
+			sequence_counter += 1
+			sequence_counter &= 0xffffff
 
 			buffer_target_offset = int.from_bytes(status_data[4 : 8], 'little')
 			vgm_start_offset = int.from_bytes(status_data[8 : 12], 'little')
@@ -203,7 +212,7 @@ while True:
 	try:
 		if not status_thread.is_alive():
 			break
-			
+
 		time.sleep(0.5)
 	except KeyboardInterrupt:
 		status_stopping_event.set()

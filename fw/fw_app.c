@@ -135,6 +135,7 @@ void main() {
 			mute_all();
 			fm_init();
 
+			ymu_reset_sequence_counter();
 			vgm_init_playback(&player_ctx);
 
 			playback_active = true;

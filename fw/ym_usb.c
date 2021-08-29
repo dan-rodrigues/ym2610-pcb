@@ -29,6 +29,7 @@ static size_t start_offset;
 static size_t write_offset;
 static size_t end_offset;
 static bool write_active;
+static uint32_t sequence_counter;
 
 static bool playback_start_pending;
 
@@ -97,8 +98,13 @@ static bool ymu_send_status(const uint32_t *status) {
 
 bool ymu_request_vgm_buffering(uint32_t target_offset, uint32_t vgm_start_offset, uint32_t vgm_chunk_length) {
 	const uint32_t buffer_request_header = 0x01;
+
+	uint32_t header = buffer_request_header | sequence_counter << 8;
+	sequence_counter++;
+	sequence_counter &= 0xffffff;
+
 	const uint32_t data[4] = {
-		buffer_request_header,
+		header,
 		target_offset,
 		vgm_start_offset,
 		vgm_chunk_length
@@ -115,6 +121,10 @@ bool ymu_report_status(uint32_t status) {
 	};
 
 	return ymu_send_status(data);
+}
+
+void ymu_reset_sequence_counter() {
+	sequence_counter = 0;
 }
 
 // Only 32bit aligned addresses seem to be handled by usb_data_read()
@@ -328,4 +338,5 @@ static struct usb_fn_drv _ymu_drv = {
 void ymu_init(void) {
 	/* Register function driver */
 	usb_register_function_driver(&_ymu_drv);
+	ymu_reset_sequence_counter();
 }
