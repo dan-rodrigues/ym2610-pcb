@@ -7,6 +7,7 @@
 # SPDX-License-Identifier: MIT
 
 import sys
+import errno
 
 from vgm_preprocess import VGMPreprocessor
 from vgm_preprocess import PCMType
@@ -138,11 +139,16 @@ def poll_status(stopping_event, status_ep, data_ep, processed_vgm):
 			vgm_chunk = vgm_data[vgm_start_offset : vgm_start_offset + vgm_chunk_length]
 
 			send_vgm(dev, data_ep, vgm_chunk, buffer_target_offset, restart_playback=False)
-
-		except usb.core.USBError as e:
-			# Swallowing exceptions like this is dirty but there are several coming in as "timeouts"
-			# FIXME: filter out the exceptions of interest and raise the non-timeout related ones
+		except usb.core.USBTimeoutError:
+			# Timeouts are expected when no data is available since we're polling
 			continue
+		except usb.core.USBError as e:
+			# Incase a libusb version without USBTImeoutError is used, this errno case is also handled
+			if e.backend_error_code == -errno.ETIMEDOUT:
+				continue
+
+			print("A non-timeout USB exception was thrown. Exiting...")
+			raise
 
 def start_polling_status(dev, status_ep, data_ep, processed_vgm):
 	stopping_event = threading.Event()
@@ -195,6 +201,9 @@ send_vgm(dev, data_ep, processed_vgm.data)
 
 while True:
 	try:
+		if not status_thread.is_alive():
+			break
+			
 		time.sleep(0.5)
 	except KeyboardInterrupt:
 		status_stopping_event.set()
