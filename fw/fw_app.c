@@ -163,6 +163,7 @@ void main() {
 		}
 
 		// MIDI (simple demo using FM for now):
+		// This does nothing if the MIDI UART in the Verilog source is disabled
 
 		midi_update();
 

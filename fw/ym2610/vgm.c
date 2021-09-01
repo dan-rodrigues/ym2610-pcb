@@ -41,13 +41,14 @@ static void vgm_player_sanity_check(void);
 static void vgm_player_init(struct vgm_player_context *context);
 static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_update_result *result);
 
-static bool vgm_filter_reg_write(uint8_t port, uint8_t reg, uint8_t data, const struct vgm_player_context *ctx);
+static bool vgm_allow_reg_write(uint8_t port, uint8_t reg, uint8_t data, const struct vgm_player_context *ctx);
 static void vgm_record_reg_write(uint8_t port, uint8_t reg, uint8_t data, struct vgm_player_context *ctx);
 
-// VGM buffer
+// VGM buffer (96kbyte)
 static uint8_t vgm[0x18000];
 
-// 80kbyte: fixed region at start
+// 72kbyte: fixed region at start
+// 8kbyte:  buffer used to store first block at start of loop
 // 8kbyte:  buffer A
 // 8kbyte:  buffer B
 static const uint32_t buffer_a_offset = 0x14000;
@@ -316,7 +317,7 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_upd
 				uint8_t data = vgm_player_read_byte(ctx, result);
 
 				vgm_record_reg_write(0, reg, data, ctx);
-				if (vgm_filter_reg_write(0, reg, data, ctx)) {
+				if (vgm_allow_reg_write(0, reg, data, ctx)) {
 					ym_write_a(reg, data);
 				}
 			} break;
@@ -327,7 +328,7 @@ static uint32_t vgm_player_update(struct vgm_player_context *ctx, struct vgm_upd
 				uint8_t data = vgm_player_read_byte(ctx, result);
 
 				vgm_record_reg_write(1, reg, data, ctx);
-				if (vgm_filter_reg_write(1, reg, data, ctx)) {
+				if (vgm_allow_reg_write(1, reg, data, ctx)) {
 					ym_write_b(reg, data);
 				}
 			} break;
@@ -385,7 +386,7 @@ static void vgm_record_reg_write(uint8_t port, uint8_t reg, uint8_t data, struct
 	}
 }
 
-static bool vgm_filter_reg_write(uint8_t port, uint8_t reg, uint8_t data, const struct vgm_player_context *ctx) {
+static bool vgm_allow_reg_write(uint8_t port, uint8_t reg, uint8_t data, const struct vgm_player_context *ctx) {
 	uint16_t address = port << 8 | reg;
 
 	if (ctx->filter_fm_pitch && (reg >= 0xa0 && reg <= 0xa6)) {

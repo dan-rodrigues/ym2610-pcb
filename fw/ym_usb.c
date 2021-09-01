@@ -280,38 +280,36 @@ struct ym_ctrl_handler {
 	ym_ctrl_handler handler;
 };
 
-static struct ym_ctrl_handler ctrl_handlers[] = {
+static const struct ym_ctrl_handler ctrl_handlers[] = {
 	{.request = YMU_CTRL_READ_STATUS, .is_read = true, .handler = ymu_ctrl_read_status},
 	{.request = YMU_CTRL_START_PLAYBACK, .is_read = false, .handler = ymu_ctrl_start_playback},
 	{.request = YMU_CTRL_SET_WRITE_MODE, .is_read = false, .handler = ymu_ctrl_defer_set_write_mode}
 };
+static const size_t ym_ctrl_handler_count = sizeof(ctrl_handlers) / sizeof(ym_ctrl_handler);
 
 // Control request dispatch:
 
 static enum usb_fnd_resp ymu_ctrl_req(struct usb_ctrl_req *req, struct usb_xfer *xfer) {
-	printf("audio ctrl req: %X\n", req->bRequest);
+	printf("Received control request: %X\n", req->bRequest);
 
 	if (USB_REQ_TYPE(req) != USB_REQ_TYPE_VENDOR) {
 		return USB_FND_CONTINUE;
 	}
-	if ((req->bmRequestType ^ req->bRequest) & 0x80 ||
-		req->wIndex != 0 ||
-		USB_REQ_RCPT(req) != USB_REQ_RCPT_INTF)
+	if ((req->bmRequestType ^ req->bRequest) & 0x80
+		|| req->wIndex != 0
+		|| USB_REQ_RCPT(req) != USB_REQ_RCPT_INTF)
 	{
 		return USB_FND_ERROR;
 	}
 
-	static const size_t handler_count = sizeof(ctrl_handlers) / sizeof(ym_ctrl_handler);
-	bool is_read = USB_REQ_IS_READ(req);
-
-	for (uint32_t i = 0; i < handler_count; i++) {
+	for (uint32_t i = 0; i < ym_ctrl_handler_count; i++) {
 		const struct ym_ctrl_handler *ctx = &ctrl_handlers[i];
 
 		if (ctx->request != req->bRequest) {
 			continue;
 		}
 
-		if (is_read ^ ctx->is_read) {
+		if (USB_REQ_IS_READ(req) ^ ctx->is_read) {
 			printf("Control request RW type mismatch\n");
 			return USB_FND_ERROR;
 		}
