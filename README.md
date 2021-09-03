@@ -86,3 +86,4 @@ After flashing the firmware, the RGB LED should slowly flash indicating that it'
 ./scripts/usb_ctrl.py track.vgm
 ```
 
+More details about the scripts can be found in their [README](scripts/README.md) file.
