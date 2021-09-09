@@ -193,20 +193,21 @@ module spi_mem #(
 			if (state == S_DATA && state_changing_to(S_IDLE)) begin
 				if (quad_data_output) begin
 					mem_rdata[31:24] <= {
-						shift_in_3[7], shift_in_2[7], shift_in[7], shift_in_0[7],
-						shift_in_3[6], shift_in_2[6], shift_in[6], shift_in_0[6]
-					};
-					mem_rdata[23:16] <= {
 						shift_in_3[5], shift_in_2[5], shift_in[5], shift_in_0[5],
 						shift_in_3[4], shift_in_2[4], shift_in[4], shift_in_0[4]
 					};
-					mem_rdata[15:8] <= {
+					mem_rdata[23:16] <= {
 						shift_in_3[3], shift_in_2[3], shift_in[3], shift_in_0[3],
 						shift_in_3[2], shift_in_2[2], shift_in[2], shift_in_0[2]
 					};
-					mem_rdata[7:0] <= {
+					mem_rdata[15:8] <= {
 						shift_in_3[1], shift_in_2[1], shift_in[1], shift_in_0[1],
 						shift_in_3[0], shift_in_2[0], shift_in[0], shift_in_0[0]
+					};
+					// Use shifter intput directly to save 1 cycle
+					mem_rdata[7:0] <= {
+						spi_io_in[3][1], spi_io_in[2][1], spi_io_in[1][1], spi_io_in[0][1],
+						spi_io_in[3][0], spi_io_in[2][0], spi_io_in[1][0], spi_io_in[0][0]
 					};
 				end else begin
 					mem_rdata <= {shift_in[7:0], shift_in[15:8], shift_in[23:16], shift_in[31:24]};
@@ -405,7 +406,7 @@ module spi_mem #(
 	reg data_shift_done;
 
 	always @* begin
-		cmd_shift_done = shift_count == 3;
+		cmd_shift_done = shift_count == (4 - 1);
 		if (quad_cmd_output) begin
 			cmd_shift_done = shift_count == (1 - 1);
 		end
@@ -417,7 +418,8 @@ module spi_mem #(
 
 		data_shift_done = (shift_count == ((mem_length_r + 1) * 4) + 1);
 		if (quad_data_output) begin
-			data_shift_done = (shift_count == ((mem_length_r + 1) * 1) + 1);
+			// No "+1" here since shifter input is used on last cycle of read
+			data_shift_done = (shift_count == (mem_length_r + 1 + (mem_we ? 1 : 0)));
 		end
 	end
 
