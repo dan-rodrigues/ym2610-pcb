@@ -378,13 +378,14 @@ module adpcm_a_reader(
 			2: begin
 				// High nybble: setup + LE high
 				pw_mux_sel_nx = 3'b010;
-				pw_ym_io_out_nx = pcm[7:4];
+				// Note the bit reversal
+				pw_ym_io_out_nx = {pcm[4], pcm[5], pcm[6], pcm[7]};
 				pw_pcm_load_nx = 1;
 			end
 			3: begin
 				// High nybble: hold + LE low
 				pw_mux_sel_nx = 3'b010;
-				pw_ym_io_out_nx = pcm[7:4];
+				pw_ym_io_out_nx = {pcm[4], pcm[5], pcm[6], pcm[7]};
 			end
 			4: begin
 				// Extra state incase ADPCMB interrupts the write on final cycle

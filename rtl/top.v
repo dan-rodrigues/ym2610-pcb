@@ -15,7 +15,7 @@
 
 module top #(
 	parameter [0:0] ENABLE_DAC_DEBUG_REGS = 0,
-	parameter [0:0] ENABLE_MIDI = 1
+	parameter [0:0] ENABLE_MIDI = 0
 ) (
 	// SPI
 	inout  wire [3:0] spi_io,
@@ -515,7 +515,6 @@ module top #(
 	) ym_pmod_out_sbio [3:0] (
 		.INPUT_CLK(clk_24m),
 		.OUTPUT_CLK(clk_24m),
-		.CLOCK_ENABLE(1'b1),
 
 		.PACKAGE_PIN({dac_sh1, dac_sh2, dac_clk, dac_so}),
 		.D_IN_0({dac_sh1_r, dac_sh2_r, dac_clk_r, dac_so_r})
