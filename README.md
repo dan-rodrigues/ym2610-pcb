@@ -6,7 +6,13 @@ The goal is to make the complete system both low-cost and flexible which increas
 
 The FPGA board used is the [iCEBreaker Bitsy](https://1bitsquared.com/collections/fpga/products/icebreaker-bitsy) which is also [open source](https://github.com/icebreaker-fpga/icebreaker). It's the small purple board in the bottom left of the photo. A custom vendor USB device and a companion host Python script is used for control. The USB core used is [no2usb](https://github.com/no2fpga/no2usb).
 
-## Assembled PCB (v1.0.1)
+## Assembled PCBs
+
+### v1.1.0 (partial)
+
+![v1.1.0 PCB partially assembled](photo/pcb5.jpg)
+
+### v1.0.1
 
 ![v1.0.1 PCB assembled](photo/pcb4.jpg)
 
